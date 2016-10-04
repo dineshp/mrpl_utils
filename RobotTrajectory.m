@@ -96,11 +96,10 @@ classdef RobotTrajectory < handle
             obj.robotState.w(n) = w_n_ref;
         end
         
-        function pose = getPoseAtTime(obj,index)            
-            x_t = interp1(obj.robotState.t, transpose(obj.robotState.x), index, 'spline');
-            y_t = interp1(obj.robotState.t, transpose(obj.robotState.y), index, 'spline');
-            th_t = interp1(obj.robotState.t, transpose(obj.robotState.th), index, 'spline');
-            
+        function pose = getPoseAtTime(obj,index)  
+            x_t = interp1(obj.robotState.t, transpose(obj.robotState.x), index);
+            y_t = interp1(obj.robotState.t, transpose(obj.robotState.y), index);
+            th_t = interp1(obj.robotState.t, transpose(obj.robotState.th), index);
             pose = Pose(x_t,y_t,th_t);
         end
         

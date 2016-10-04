@@ -1,14 +1,25 @@
 classdef TrajectoryFollower
-
+    
     properties(Constant)
+        k_x_p = 1.5;
+        k_y_p = 1.5;
+        k_th_p = 5;
         UpdatePause = .05;
     end
     
     properties(Access = public)
         robotState;
-        controller;
-        fig1;
-        fig2;
+        signal1;
+        signal2;
+        signal3;
+        signal4;
+        signal5;
+        signal6;
+        signal7;
+        signal8;
+        signal9;
+        signal10;
+        signal11;
     end
 
     properties(Access = private)
@@ -19,46 +30,86 @@ classdef TrajectoryFollower
         
     end
     
-    methods(Access = public)       
-        function obj = TrajectoryFollower(robot, robotTrajectoryModel, controller)
-            obj.controller = controller;    
+    methods(Access = public)     
+        
+        function [u_V, u_w] = feedback(obj,p_i_act,p_i_ref,dt)
+             %TODO, Figure out how input parameters goalToWorld, actual to
+             %World, dt, and previous error
+             r_r_p = p_i_act.aToB()*(p_i_ref.getPoseVec() - p_i_act.getPoseVec());
+             u_p = [obj.k_x_p 0 0; 0 obj.k_y_p obj.k_th_p]*r_r_p;
+             u_V = u_p(1);
+             u_w = u_p(2);             
+        end
+        
+        function obj = TrajectoryFollower(robot, robotTrajectoryModel)
+            %initialization  
+            enableFeedback = 0;
             t_f = robotTrajectoryModel.t_f + 1; %add extra second
             n = floor(t_f/TrajectoryFollower.UpdatePause)+1;
             obj.robotState = RobotState(n);
+            %get reference to reference and actual state
+            actual_robot = obj.robotState;
+            t = actual_robot.t;
+            w = actual_robot.w;
+            V = actual_robot.V;
+            s = actual_robot.s;
+            x = actual_robot.x;
+            y = actual_robot.y;
+            th = actual_robot.th;
             figure('units', 'normalized', 'outerposition', [0 0 1 1]);
+            hold on;
+            %initilize figures and signals
             x_g_ref = zeros(1,n);
             y_g_ref = zeros(1,n);
-            subplot(2,2,1);
-            obj.fig1 = plot(x_g_ref, y_g_ref, 'k-');
+            th_g_ref = zeros(1,n);
+            obj.signal1 = plot(t, x_g_ref, 'm-^', 'Linewidth', 1, 'MarkerSize', 10);
             hold on;
+            obj.signal2 = plot(t, y_g_ref, 'm-p', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            obj.signal3 = plot(t, th_g_ref, 'm-o', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            obj.signal4 = plot(t, x, 'c-^', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            obj.signal5 = plot(t, y, 'c-p', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            obj.signal6 = plot(t, th, 'c-o', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            axis auto;
+            xlabel('Time');
+            ylabel('X Y TH');
+            legend('x_r_e_f', 'y_r_e_f', 'th_r_e_f', 'x_a_c_t', 'y_a_c_t', 'th_a_c_t');
+            title(['Reference (magenta) & Actual (cyan) Trajectory']);        
                                     
-            x_g_act = zeros(1,n);
-            y_g_act = zeros(1,n);
-            obj.fig2 = plot(x_g_act, y_g_act, 'b-o');
+            figure('units', 'normalized', 'outerposition', [0 0 1 1]);
             hold on;
-                        
             xlim([-0.6 0.6]);
             ylim([-0.6 0.6]);
+            title(['Reference (magenta circles) & Actual (cyan line) Trajectory (x vs. y) in world coord.']);
+            obj.signal7 = plot(x_g_ref, y_g_ref, 'm-o', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            obj.signal8 = plot(x, y, 'c-', 'Linewidth', 1);
+            hold on;
             xlabel('X');
             ylabel('Y');
-            title(['Estimated Robot (blue) & Reference (black) Trajectory']);
-                  
-            subplot(2,2,2);
-            axis auto;
-            hold on;
-            xlabel('Time');
-            ylabel('Error in mm');
-            title(['Error between Estimated Robot & Reference Trajectory']);
+            legend('ref', 'act');
             
-            subplot(2,2,3);
-            axis auto;
+            figure('units', 'normalized', 'outerposition', [0 0 1 1]);
             hold on;
+            axis auto;
+            title(['Error in body coord']);
+            err_x_g_ref = zeros(1,n);
+            err_y_g_ref = zeros(1,n);
+            err_th_g_ref = zeros(1,n);
+            obj.signal9 = plot(t, err_x_g_ref, 'r-^', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            obj.signal10 = plot(t, err_y_g_ref, 'r-p', 'Linewidth', 1, 'MarkerSize', 10);
+            hold on;
+            obj.signal11 = plot(t, err_th_g_ref, 'r-o', 'Linewidth', 1, 'MarkerSize', 10);
             xlabel('Time');
-            ylabel('Error in degrees');
-            title(['Error between Estimated Robot Heading & Reference Heading']);
-            
-            t = 0;
-            tStart = 0;
+            ylabel('X Y TH');
+            legend('x_e_r_r', 'y_e_r_r', 'th_e_r_r');
+
+            t_i = 0;
             dt_i = 0;
             prevX = getX;
             prevY = getY;
@@ -66,8 +117,9 @@ classdef TrajectoryFollower
             cT = pT;
             curX = prevX;
             curY = prevY;
+            i = actual_robot.i;
             firstIteration = 0;
-            while(t <= t_f)
+            while(t_i <= t_f)
                 if(firstIteration == 0)
                     while(eq(cT, pT))     
                         cT = getT;
@@ -76,21 +128,36 @@ classdef TrajectoryFollower
                         pause(.001);
                     end
                     dt_i = cT - pT; 
-                    firstIteration = 1;
+                    pT = cT;
+                    set(obj.signal1, 'xdata', [get(obj.signal1,'xdata') t(i)], 'ydata', [get(obj.signal1,'ydata') x_g_ref(i)]);
+                    set(obj.signal2, 'xdata', [get(obj.signal2,'xdata') t(i)], 'ydata', [get(obj.signal2,'ydata') y_g_ref(i)]);
+                    set(obj.signal3, 'xdata', [get(obj.signal3,'xdata') t(i)], 'ydata', [get(obj.signal3,'ydata') th_g_ref(i)]);
+                    set(obj.signal4, 'xdata', [get(obj.signal4,'xdata') t(i)], 'ydata', [get(obj.signal4,'ydata') x(i)]);
+                    set(obj.signal5, 'xdata', [get(obj.signal5,'xdata') t(i)], 'ydata', [get(obj.signal5,'ydata') y(i)]);
+                    set(obj.signal6, 'xdata', [get(obj.signal6,'xdata') t(i)], 'ydata', [get(obj.signal6,'ydata') th(i)]) 
+                    set(obj.signal7, 'xdata', [get(obj.signal7,'xdata') -y_g_ref(i)], 'ydata', [get(obj.signal7,'ydata') x_g_ref(i)]);
+                    set(obj.signal8, 'xdata', [get(obj.signal8,'xdata') -y(i)], 'ydata', [get(obj.signal8,'ydata') x(i)]);
+                    set(obj.signal9, 'xdata', [get(obj.signal9,'xdata') t(i)], 'ydata', [get(obj.signal9,'ydata') err_x_g_ref(i)]);
+                    set(obj.signal10, 'xdata', [get(obj.signal10,'xdata') t(i)], 'ydata', [get(obj.signal10,'ydata') err_y_g_ref(i)]);
+                    set(obj.signal11, 'xdata', [get(obj.signal11,'xdata') t(i)], 'ydata', [get(obj.signal11,'ydata') err_th_g_ref(i)]);
+ 
                     obj.robotState.iPlusPlus;
+                    firstIteration = 1;
                 end
-                             
-                t = t + dt_i;
-                obj.robotState.t(obj.robotState.i) = t;
-                count = 0;
+               
+                % 1. UPDATE TIME
+                t_i = t_i + dt_i;
+                i = actual_robot.i;
+                
+                % 2. WAIT FOR ENCODER CHANGE
                 while(eq(cT, pT))     
-                    count = count + 1;
                     cT = getT;
                     curX = getX;
                     curY = getY;
                     pause(.001);
                 end
-
+                
+                % 3. UPDATE STATE (DEAD RECKONING)
                 dt_i = cT - pT;  
                 vl_i = (curX-prevX)/dt_i;
                 vr_i = (curY-prevY)/dt_i;
@@ -99,50 +166,56 @@ classdef TrajectoryFollower
                 prevY = curY;
 
                 [V_i , w_i] = RobotModelAdv.vlvrToVw(vl_i, vr_i);
-
-                obj.robotState.V(obj.robotState.i) = V_i;
-                obj.robotState.w(obj.robotState.i) = w_i;
-
-                obj.robotState.s(obj.robotState.i) = obj.robotState.s(obj.robotState.i-1) + (V_i*dt_i);
-
-                p_prev = Pose(obj.robotState.x(obj.robotState.i-1), obj.robotState.y(obj.robotState.i-1), obj.robotState.th(obj.robotState.i-1));
+                p_prev = Pose(x(i-1), y(i-1), th(i-1));
                 p_i_act = RobotModelAdv.integrateDiffEq(V_i, w_i, dt_i, p_prev);
-                obj.robotState.x(obj.robotState.i) = p_i_act.x;
-                obj.robotState.y(obj.robotState.i) = p_i_act.y;
-                obj.robotState.th(obj.robotState.i) = p_i_act.th;
-
-                p_i_ref = robotTrajectoryModel.getPoseAtTime(t);
-
-                [u_ref_V, u_ref_w] = robotTrajectoryModel.getVelocitiesAtTime(t);
-                %compute error and proportional control here
-                [u_p_V, u_p_w] = obj.controller.feedback(p_i_act,p_i_ref,dt_i);  
-                V_i = u_ref_V + u_p_V;
-                w_i = u_ref_w + u_p_w;
+                t(i) = t_i;
+                V(i) = V_i;
+                w(i) = w_i;
+                s(i) = s(i-1) + (V_i*dt_i);
+                x(i) = p_i_act.x;
+                y(i) = p_i_act.y;
+                th(i) = p_i_act.th;
+                
+                % 4. UPDATE CONTROL
+                p_i_ref = robotTrajectoryModel.getPoseAtTime(t_i);
+       
+                %get velocity from open loop 
+                [u_ref_V, u_ref_w] = robotTrajectoryModel.getVelocitiesAtTime(t_i);
+                [u_p_V, u_p_w] = obj.feedback(p_i_act,p_i_ref,dt_i);
+                V_i = u_ref_V + (enableFeedback*u_p_V);
+                w_i = u_ref_w + (enableFeedback*u_p_w);
+                
                 [v_l_U , v_r_U] = RobotModelAdv.VwTovlvr(V_i, w_i);
                 [v_l_U , v_r_U] = RobotModelAdv.limitWheelVelocities([v_l_U , v_r_U]);
-
+                %5. SEND CONTROL TO ROBOT
                 robot.sendVelocity(v_l_U, v_r_U); 
-
-                subplot(2,2,1);
-                x_g_ref(obj.robotState.i) = p_i_ref.x;
-                y_g_ref(obj.robotState.i) = p_i_ref.y;
-                set(obj.fig1, 'xdata', [get(obj.fig1,'xdata') -y_g_ref(obj.robotState.i)], 'ydata', [get(obj.fig1,'ydata') x_g_ref(obj.robotState.i)]);
-
-                x_g_act(obj.robotState.i) = p_i_act.x;
-                y_g_act(obj.robotState.i) = p_i_act.y;
-                set(obj.fig2, 'xdata', [get(obj.fig2,'xdata') -y_g_act(obj.robotState.i)], 'ydata', [get(obj.fig2,'ydata') x_g_act(obj.robotState.i)]);
-
+            
+                %6. UPDATE GRAPHS
+                x_g_ref(i) = p_i_ref.x;
+                y_g_ref(i) = p_i_ref.y;
+                th_g_ref(i) = p_i_ref.th; 
+                set(obj.signal1, 'xdata', [get(obj.signal1,'xdata') t(i)], 'ydata', [get(obj.signal1,'ydata') x_g_ref(i)]);
+                set(obj.signal2, 'xdata', [get(obj.signal2,'xdata') t(i)], 'ydata', [get(obj.signal2,'ydata') y_g_ref(i)]);
+                set(obj.signal3, 'xdata', [get(obj.signal3,'xdata') t(i)], 'ydata', [get(obj.signal3,'ydata') th_g_ref(i)]);
+                set(obj.signal4, 'xdata', [get(obj.signal4,'xdata') t(i)], 'ydata', [get(obj.signal4,'ydata') x(i)]);
+                set(obj.signal5, 'xdata', [get(obj.signal5,'xdata') t(i)], 'ydata', [get(obj.signal5,'ydata') y(i)]);
+                set(obj.signal6, 'xdata', [get(obj.signal6,'xdata') t(i)], 'ydata', [get(obj.signal6,'ydata') th(i)]) 
+                set(obj.signal7, 'xdata', [get(obj.signal7,'xdata') -y_g_ref(i)], 'ydata', [get(obj.signal7,'ydata') x_g_ref(i)]);
+                set(obj.signal8, 'xdata', [get(obj.signal8,'xdata') -y(i)], 'ydata', [get(obj.signal8,'ydata') x(i)]);
+                %computer error in body coord.
+                r_r_p = p_i_act.aToB()*(p_i_ref.getPoseVec() - p_i_act.getPoseVec());
+                err_x_g_ref(i) = r_r_p(1);
+                err_y_g_ref(i) = r_r_p(2);
+                err_th_g_ref(i) = r_r_p(3);
+                set(obj.signal9, 'xdata', [get(obj.signal9,'xdata') t(i)], 'ydata', [get(obj.signal9,'ydata') err_x_g_ref(i)]);
+                set(obj.signal10, 'xdata', [get(obj.signal10,'xdata') t(i)], 'ydata', [get(obj.signal10,'ydata') err_y_g_ref(i)]);
+                set(obj.signal11, 'xdata', [get(obj.signal11,'xdata') t(i)], 'ydata', [get(obj.signal11,'ydata') err_th_g_ref(i)]);
+     
+                %7. update logger index (update sim if sim?)
+                actual_robot.iPlusPlus;
                 
-                errorD = sqrt(((p_i_ref.x - p_i_act.x)^2 + (p_i_ref.y - p_i_act.y)^2));
-                subplot(2,2,2);
-                scatter(t, errorD*1000, 'X');
-               
-                subplot(2,2,3);
-                scatter(t, rad2deg(p_i_ref.th-p_i_act.th), 'X');
-                
-                obj.robotState.iPlusPlus;
-
-                pause(max(0, (TrajectoryFollower.UpdatePause-(count*.001))));
+                %8. DELAY MAC CLOCK
+                pause(TrajectoryFollower.UpdatePause);
             end
             robot.stop();
         end
