@@ -10,6 +10,7 @@ classdef RobotTrajectory < handle
         refCRobotCommands
         numSamples
         t_f
+        t_f_robot_commands
     end
 
     properties(Access = private)
@@ -67,6 +68,7 @@ classdef RobotTrajectory < handle
             obj.refC = refC;
             obj.refCRobotCommands = refCRobotCommands;
             obj.t_f = refC.getTrajectoryDuration;
+            obj.t_f_robot_commands = refCRobotCommands.getTrajectoryDuration;
             obj.numSamples = floor(obj.t_f/RobotTrajectory.dt)+1;
             n = obj.numSamples;
             
