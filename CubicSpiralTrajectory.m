@@ -1,6 +1,5 @@
-
 classdef CubicSpiralTrajectory < handle
-    % CubicSpiral Implements a planar trajectory specified in terms of three 
+    %cubicSpiral Implements a planar trajectory specified in terms of three 
     % coefficients that adjust the terminal pose of the robot. The initial
     % pose is assumed to be the origin with zero curvature. The terminal
     % curvature is forced to be zero.
@@ -30,7 +29,7 @@ classdef CubicSpiralTrajectory < handle
     methods(Static = true)
         
         function makeLookupTable(scale)
-            % Make 6 lookup tables to be used for CubicSpiral generation.
+            % Make 6 lookup tables to be used for cubicSpiral generation.
             % Principle is to sample densely in coefficient space and
             % integrate the curvature to find the curve. Then store the
             % result in a table that inverts the mapping.
@@ -117,7 +116,7 @@ classdef CubicSpiralTrajectory < handle
                         y = p_y + ((ds/6.0) * (k01 + 2*(k11 + k21) + k31));
                     end
                     if(broke == true); continue; end;
-                    
+
                     q = atan2(y,x);
                     %if(~aTab.isInBounds(q,t)); continue; end;
                     % This is faster
@@ -185,7 +184,7 @@ classdef CubicSpiralTrajectory < handle
             persistent a1T a2T b1T b2T r1T r2T;
                     
             if(isempty(inited))
-                load('cubicSpirals','a1Tab','a2Tab','b1Tab','b2Tab','r1Tab','r2Tab');
+                load('cubicSpirals_scale_2','a1Tab','a2Tab','b1Tab','b2Tab','r1Tab','r2Tab');
                 inited = true;
                 a1T = a1Tab;a2T = a2Tab;b1T = b1Tab;b2T = b2Tab;r1T = r1Tab;r2T = r2Tab;
             end
@@ -230,7 +229,7 @@ classdef CubicSpiralTrajectory < handle
 
             % Plot the corresponding unit
             su = 1.0;
-            clothu = CubicSpiralTrajectory([au bu su],2001);
+            clothu = CubicSpiralTrajectory([au bu su],201);
 
             %hold on;
 
@@ -249,7 +248,7 @@ classdef CubicSpiralTrajectory < handle
                 as = -as;  
                 ss = -ss;
             end
-            curve = CubicSpiralTrajectory([as bs ss],201);
+            curve = CubicSpiralTrajectory([as bs ss],5001);
         end
             
     end
@@ -277,37 +276,19 @@ classdef CubicSpiralTrajectory < handle
             b = obj.parms(2);
             sf = obj.parms(3);
             ds = sf/(obj.numSamples-1);
-            for i=1:obj.numSamples-1             
+            for i=1:obj.numSamples-1
                 s_i = (i-1)*ds;
                 obj.distArray(i) = s_i;
                 
                 kurv_s = s_i*(a + b*s_i)*(s_i-sf);
                 obj.curvArray(i) = kurv_s;
                 
-                p_th = obj.poseArray(3,i);
-                p_x = obj.poseArray(1,i);
-                p_y = obj.poseArray(2,i);
+                p_pose = Pose(obj.poseArray(1,i), obj.poseArray(2,i), obj.poseArray(3,i));
+                pose = RobotModelAdv.integrateDiffEqDs(kurv_s, ds, p_pose);
                 
-                th = p_th + (kurv_s)*ds;
-                   
-                k00 = cos(p_th);
-                k01 = sin(p_th);
-
-                k10 = cos(p_th + (ds/2.0) * kurv_s);
-                k11 = sin(p_th + (ds/2.0) * kurv_s);
-
-                k20 = k10;
-                k21 = k11;
-
-                k30 = cos(th);
-                k31 = sin(th);                
-                x = p_x + ((ds/6.0) * (k00 + 2*(k10 + k20) + k30));
-                y = p_y + ((ds/6.0) * (k01 + 2*(k11 + k21) + k31));
-                
-                obj.poseArray(3,i+1) = th;
-                obj.poseArray(1,i+1) = x;
-                obj.poseArray(2,i+1) = y;
-                      
+                obj.poseArray(3,i+1) = pose.th;
+                obj.poseArray(1,i+1) = pose.x;
+                obj.poseArray(2,i+1) = pose.y;
             end
             i = obj.numSamples;
             s = (i-1)*ds;  
@@ -337,7 +318,7 @@ classdef CubicSpiralTrajectory < handle
     methods(Access = public)
         
         function obj = CubicSpiralTrajectory(parms,numSamples)
-            % Constructs a CubicSpiral for the supplied parameters. The
+            % Constructs a cubicSpiral for the supplied parameters. The
             % parameters are in order [a b sf]. numSamples is the
             % number of integration steps used to integrate the entire 			
             % curve. The curve is integrated immediately when this
@@ -384,9 +365,7 @@ classdef CubicSpiralTrajectory < handle
                 V = Vbase*obj.sgn; % Drive forward or backward as desired.
                 K = obj.curvArray(i);
                 w = K*V;
-                %RobotModel Not Defined
-                vr = V + RobotModel.ModelW*w;
-                vl = V - RobotModel.ModelW*w;               
+                [vl , vr] = RobotModelAdv.VwTovlvr(V, w);              
                 if(abs(vr) > Vbase)
                     vrNew = Vbase * sign(vr);
                     vl = vl * vrNew/vr;
@@ -399,8 +378,9 @@ classdef CubicSpiralTrajectory < handle
                 end
                 obj.vlArray(i) = vl;
                 obj.vrArray(i) = vr;
-                obj.VArray(i) = (vr + vl)/2.0;
-                obj.wArray(i) = (vr - vl)/RobotModel.ModelW;                
+                [V_ramp, w_ramp] = RobotModelAdv.vlvrToVw(vl, vr);
+                obj.VArray(i) = V_ramp;
+                obj.wArray(i) = w_ramp;                
             end
             % Now compute the times that are implied by the velocities and
             % the distances.
@@ -416,7 +396,7 @@ classdef CubicSpiralTrajectory < handle
             J(:,1) = (posePlus-poseObj)/eps;
            
             dp = [0.0 eps 0.0];
-            clothPlus2 = CubicSpiralTrajectory(obj.parms+dp,obj.numSamples);
+            clothPlus2 = CubicSpiralTrajecotry(obj.parms+dp,obj.numSamples);
             posePlus = clothPlus2.getFinalPose;
             poseObj = obj.getFinalPose();
             J(:,2) = (posePlus-poseObj)/eps;
@@ -431,7 +411,7 @@ classdef CubicSpiralTrajectory < handle
         function refineParameters(obj,goalPose)
             disp('Entering iterations');
             newParms = obj.getParms();
-            newObj = CubicSpiralTrajectory(newParms,5001); % hi samples for derivatives
+            newObj = CubicSpiralTrajecotry(newParms,5001); % hi samples for derivatives
             thisPose = newObj.getFinalPose();
             error = inf; n = 1;
             while(error > 0.001)
@@ -451,7 +431,7 @@ classdef CubicSpiralTrajectory < handle
                 error = norm(thisPose-goalPose);
                 disp(error);
                 if(n >=20)
-                    fprintf('CubicSpiral failing to refine Parameters\n');
+                    fprintf('cubicSpiral failing to refine Parameters\n');
                     break;
                 end
             end
@@ -477,15 +457,7 @@ classdef CubicSpiralTrajectory < handle
             x = interp1(obj.distArray,obj.poseArray(1,:),s,'pchip','extrap');
             y = interp1(obj.distArray,obj.poseArray(2,:),s,'pchip','extrap');
             th = interp1(obj.distArray,obj.poseArray(3,:),s,'pchip','extrap');
-            pose  = Pose(x, y, th);  
-        end
-        
-        function V = getVAtDist(obj,s)
-            V = interp1(obj.distArray,obj.VArray,s,'pchip','extrap');
-        end
-
-        function w = getwAtDist(obj,s)
-            w = interp1(obj.distArray,obj.wArray,s,'pchip','extrap');
+            pose  = Pose(x, y, th); 
         end
         
         function pose  = getFinalPose(obj)
@@ -520,7 +492,7 @@ classdef CubicSpiralTrajectory < handle
             x = interp1(obj.timeArray,obj.poseArray(1,:),t,'pchip','extrap');
             y = interp1(obj.timeArray,obj.poseArray(2,:),t,'pchip','extrap');
             th = interp1(obj.timeArray,obj.poseArray(3,:),t,'pchip','extrap');
-            pose  = Pose(x, y, th);  
+            pose  = Pose(x, y, th); 
         end  
         
         function parms  = getParms(obj)

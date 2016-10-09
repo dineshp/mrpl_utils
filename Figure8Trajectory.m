@@ -5,9 +5,10 @@ classdef Figure8Trajectory < handle
     % curvature is forced to be zero.
     
     properties(Constant)
-        k_k = 15.1084;
-        s_f = 1.0;
-        k_th = 2*pi/Figure8ReferenceControl.s_f;
+        k_s = 3.0;
+        s_f = 1.0*Figure8Trajectory.k_s;
+        k_th = (2.0*pi/Figure8Trajectory.s_f);
+        k_k = (15.1084/Figure8Trajectory.k_s);
     end
     
     properties(Access = private)
@@ -16,8 +17,6 @@ classdef Figure8Trajectory < handle
     
     properties(Access = public)
         numSamples = 0;
-        k_s;
-        k_v;
         distArray = [];
         timeArray = [];
         poseArray = [];
@@ -30,9 +29,7 @@ classdef Figure8Trajectory < handle
     
     methods(Access = public)
         
-        function obj = Figure8Trajectory(k_s, k_v, n)
-            obj.k_s = k_s;
-            obj.k_v = k_v;
+        function obj = Figure8Trajectory(n)
             obj.numSamples = n;
         end
     
@@ -50,37 +47,19 @@ classdef Figure8Trajectory < handle
             obj.curvArray(1) = 0.0;
 
             ds = Figure8Trajectory.s_f/(obj.numSamples-1);
-            for i=1:obj.numSamples-1             
+            for i=1:(obj.numSamples-1)             
                 s_i = (i-1)*ds;
                 obj.distArray(i) = s_i;
                 
-                kurv_s = (Figure8ReferenceControl.k_k/obj.k_s)*sin(Figure8ReferenceControl.k_th*s_i);
+                kurv_s = obj.k_k*sin(obj.k_th*s_i);
                 obj.curvArray(i) = kurv_s;
                 
-                p_th = obj.poseArray(3,i);
-                p_x = obj.poseArray(1,i);
-                p_y = obj.poseArray(2,i);
+                p_pose = Pose(obj.poseArray(1,i), obj.poseArray(2,i), obj.poseArray(3,i));
+                pose = RobotModelAdv.integrateDiffEqDs(kurv_s, ds, p_pose);
                 
-                th = p_th + (kurv_s)*ds;
-                   
-                k00 = cos(p_th);
-                k01 = sin(p_th);
-
-                k10 = cos(p_th + (ds/2.0) * kurv_s);
-                k11 = sin(p_th + (ds/2.0) * kurv_s);
-
-                k20 = k10;
-                k21 = k11;
-
-                k30 = cos(th);
-                k31 = sin(th);                
-                x = p_x + ((ds/6.0) * (k00 + 2*(k10 + k20) + k30));
-                y = p_y + ((ds/6.0) * (k01 + 2*(k11 + k21) + k31));
-                
-                obj.poseArray(3,i+1) = th;
-                obj.poseArray(1,i+1) = x;
-                obj.poseArray(2,i+1) = y;
-                      
+                obj.poseArray(3,i+1) = pose.th;
+                obj.poseArray(1,i+1) = pose.x;
+                obj.poseArray(2,i+1) = pose.y;     
             end
             i = obj.numSamples;
             s = (i-1)*ds;  
@@ -92,14 +71,9 @@ classdef Figure8Trajectory < handle
             plotArray1 = obj.poseArray(1,:);
             plotArray2 = obj.poseArray(2,:);
             plot(plotArray1,plotArray2,'r');
-            xf = obj.poseArray(1,obj.numSamples);
-            yf = obj.poseArray(2,obj.numSamples);
-            r = max([abs(xf) abs(yf)]);
-            xlim([-2*r 2*r]);
-            ylim([-2*r 2*r]);
         end      
                 
-        function planVelocities(obj,Vmax)
+        function planVelocities(obj,Vmax,sgn)
             % Plan the highest possible velocity for the path where no
             % wheel may exceed Vmax in absolute value.
             for i=1:obj.numSamples
@@ -118,12 +92,11 @@ classdef Figure8Trajectory < handle
                 end
                 % Now proceed with base velocity 
                 %disp(Vbase);
-                V = Vbase*obj.sgn; % Drive forward or backward as desired.
+                V = Vbase*sgn; % Drive forward or backward as desired.
                 K = obj.curvArray(i);
                 w = K*V;
-                %RobotModel Not Defined
-                vr = V + RobotModel.ModelW*w;
-                vl = V - RobotModel.ModelW*w;               
+                
+                [vl , vr] = RobotModelAdv.VwTovlvr(V, w);               
                 if(abs(vr) > Vbase)
                     vrNew = Vbase * sign(vr);
                     vl = vl * vrNew/vr;
@@ -136,8 +109,9 @@ classdef Figure8Trajectory < handle
                 end
                 obj.vlArray(i) = vl;
                 obj.vrArray(i) = vr;
-                obj.VArray(i) = (vr + vl)/2.0;
-                obj.wArray(i) = (vr - vl)/RobotModel.ModelW;                
+                [V_i, w_i] = RobotModelAdv.vlvrToVw(vl, vr);
+                obj.VArray(i) = V_i;
+                obj.wArray(i) = w_i;                
             end
             % Now compute the times that are implied by the velocities and
             % the distances.
@@ -162,27 +136,57 @@ classdef Figure8Trajectory < handle
             end
         end
         
+        function pose  = getFinalPose(obj)
+            pose  = obj.poseArray(:,obj.numSamples);  
+        end  
+        
         function time = getTimeAtDist(obj, s)
-            time = interp1(obj.distArray,obj.timeArray,s,'pchip','extrap');
+            if( s < obj.distArray(1))
+                time = 0;
+            elseif(s > obj.getTrajectoryDistance())
+                time = obj.getTrajectoryDuration();
+            else
+                time = interp1(obj.distArray,obj.timeArray,s,'pchip','extrap');
+            end
         end
         
         function dist = getDistAtTime(obj, t)
-            dist = interp1(obj.timeArray,obj.distArray,t,'pchip','extrap');
+            if( t < obj.timeArray(1))
+                dist = 0;
+            elseif (t > obj.getTrajectoryDuration())
+                dist = obj.getTrajectoryDistance();
+            else
+                dist = interp1(obj.timeArray,obj.distArray,t,'pchip','extrap');
+            end
         end
                
         function pose  = getPoseAtDist(obj,s)
-            x = interp1(obj.distArray,obj.poseArray(1,:),s,'pchip','extrap');
-            y = interp1(obj.distArray,obj.poseArray(2,:),s,'pchip','extrap');
-            th = interp1(obj.distArray,obj.poseArray(3,:),s,'pchip','extrap');
-            pose  = Pose(x, y, th);  
+            if( s < obj.distArray(1))
+                pose = Pose(0,0,0);
+            elseif (s > obj.getTrajectoryDistance())
+                pose = Pose(obj.poseArray(1,obj.numSamples), obj.poseArray(2,obj.numSamples), obj.poseArray(3,obj.numSamples));
+            else
+                x = interp1(obj.distArray,obj.poseArray(1,:),s,'pchip','extrap');
+                y = interp1(obj.distArray,obj.poseArray(2,:),s,'pchip','extrap');
+                th = interp1(obj.distArray,obj.poseArray(3,:),s,'pchip','extrap');
+                pose  = Pose(x, y, th);
+            end
         end
         
         function V = getVAtDist(obj,s)
-            V = interp1(obj.distArray,obj.VArray,s,'pchip','extrap');
+            if( s < obj.distArray(1) || s > obj.getTrajectoryDistance())
+                V = 0.0;
+            else
+                V = interp1(obj.distArray,obj.VArray,s,'pchip','extrap');
+            end
         end
 
         function w = getwAtDist(obj,s)
-            w = interp1(obj.distArray,obj.wArray,s,'pchip','extrap');
+            if( s < obj.distArray(1) || s > obj.getTrajectoryDistance())
+                w = 0.0;
+            else
+                w = interp1(obj.distArray,obj.wArray,s,'pchip','extrap');
+            end
         end
         
         function time = getTrajectoryDuration(obj)
@@ -193,10 +197,9 @@ classdef Figure8Trajectory < handle
             dist = obj.distArray(:,obj.numSamples);  
         end
         
-        function t
         
         function V  = getVAtTime(obj,t)
-            if( t < obj.timeArray(1))
+            if(t < obj.timeArray(1) || t > obj.getTrajectoryDuration())
                 V = 0.0;
             else
                 V  = interp1(obj.timeArray,obj.VArray,t,'pchip','extrap');  
@@ -204,7 +207,7 @@ classdef Figure8Trajectory < handle
         end
             
         function w  = getwAtTime(obj,t)
-            if(t < obj.timeArray(1))
+            if( t < obj.timeArray(1) || t > obj.getTrajectoryDuration())
                 w = 0.0;
             else
                 w  = interp1(obj.timeArray,obj.wArray,t,'pchip','extrap');  
@@ -212,10 +215,16 @@ classdef Figure8Trajectory < handle
         end
             
         function pose  = getPoseAtTime(obj,t)
-            x = interp1(obj.timeArray,obj.poseArray(1,:),t,'pchip','extrap');
-            y = interp1(obj.timeArray,obj.poseArray(2,:),t,'pchip','extrap');
-            th = interp1(obj.timeArray,obj.poseArray(3,:),t,'pchip','extrap');
-            pose  = Pose(x, y, th);  
+            if( t < obj.timeArray(1))
+                pose = Pose(0,0,0);
+            elseif (t > obj.getTrajectoryDuration())
+                pose = Pose(obj.poseArray(1,obj.numSamples), obj.poseArray(2,obj.numSamples), obj.poseArray(3,obj.numSamples));
+            else
+                x = interp1(obj.timeArray,obj.poseArray(1,:),t,'pchip','extrap');
+                y = interp1(obj.timeArray,obj.poseArray(2,:),t,'pchip','extrap');
+                th = interp1(obj.timeArray,obj.poseArray(3,:),t,'pchip','extrap');
+                pose  = Pose(x, y, th);  
+            end
         end  
         
     end
