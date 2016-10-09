@@ -1,14 +1,16 @@
 classdef TrajectoryFollower
     
     properties(Constant)
-        k_x_p = 1.5;
-        k_y_p = 1.5;
-        k_th_p = 1.5;
-        UpdatePause = .05;
+        k_x_p = 3.0;
+        k_y_p = 3.0;
+        k_th_p = 3.0;
+        UpdatePause = .01;
     end
     
     properties(Access = public)
         robotState;
+        curve;
+        enableFeedback;
     end
 
     properties(Access = private)
@@ -30,13 +32,18 @@ classdef TrajectoryFollower
              u_w = u_p(2);             
         end
         
-        function obj = TrajectoryFollower(robot, robotTrajectoryModel)
+        function obj = TrajectoryFollower(curve, enableFeedback)
             %initialization  
-            enableFeedback = 1;
-            t_f = robotTrajectoryModel.t_f_robot_commands; %add extra second
+            obj.enableFeedback = enableFeedback;
+            obj.curve = curve;
+        end
+        
+        function executeTrajectory(obj, robot, t_delay)
+            %get reference to reference and actual state
+            t_f = obj.curve.getTrajectoryDuration();
             n = floor(t_f/TrajectoryFollower.UpdatePause)+1;
             obj.robotState = RobotState(n);
-            %get reference to reference and actual state
+            curve = obj.curve;
             actual_robot = obj.robotState;
             t = actual_robot.t;
             w = actual_robot.w;
@@ -108,9 +115,11 @@ classdef TrajectoryFollower
             curY = prevY;
             i = actual_robot.i;
             firstIteration = 0;
-            while(t_i <= (t_f))
+            sf = curve.distArray(end);
+            while(t_i <= (t_f+t_delay) && (s(i) < sf))
 
                 if(firstIteration == 0)
+                    
                     while(eq(cT, pT))     
                         cT = getT;
                         curX = getX;
@@ -131,10 +140,11 @@ classdef TrajectoryFollower
                     set(signal9, 'xdata', [get(signal9,'xdata') t(i)], 'ydata', [get(signal9,'ydata') err_x_g_ref(i)]);
                     set(signal10, 'xdata', [get(signal10,'xdata') t(i)], 'ydata', [get(signal10,'ydata') err_y_g_ref(i)]);
                     set(signal11, 'xdata', [get(signal11,'xdata') t(i)], 'ydata', [get(signal11,'ydata') err_th_g_ref(i)]);
-
-
+                                        
                     obj.robotState.iPlusPlus;
                     firstIteration = 1;
+                    s(1) = curve.distArray(2);
+                    pause(TrajectoryFollower.UpdatePause);
                 end
                
                 % 1. UPDATE TIME
@@ -169,18 +179,19 @@ classdef TrajectoryFollower
                 th(i) = p_i_act.th;
                 
                 % 4. UPDATE CONTROL
-                p_i_ref = robotTrajectoryModel.getPoseAtTime(t_i);
+                p_i_ref = curve.getPoseAtDist(s(i));
        
                 %get velocity from open loop 
-                [u_ref_V, u_ref_w] = robotTrajectoryModel.getVelocitiesAtTime(t_i);
+                u_ref_V = curve.getVAtDist(s(i-1));
+                u_ref_w = curve.getwAtDist(s(i-1));
                 [u_p_V, u_p_w] = obj.feedback(p_i_act,p_i_ref,dt_i);
-                V_send = u_ref_V + (enableFeedback*u_p_V);
-                w_send = u_ref_w + (enableFeedback*u_p_w);
+                V_i = u_ref_V + (obj.enableFeedback*u_p_V);
+                w_i = u_ref_w + (obj.enableFeedback*u_p_w);
                 
-                [v_l_U , v_r_U] = RobotModelAdv.VwTovlvr(V_send, w_send);
+                [v_l_U , v_r_U] = RobotModelAdv.VwTovlvr(V_i, w_i);
                 [v_l_U , v_r_U] = RobotModelAdv.limitWheelVelocities([v_l_U , v_r_U]);
                 %5. SEND CONTROL TO ROBOT
-                if((s(i) > 0) && ((v_l_U == 0) && (v_r_U == 0)))
+                if((s(i) >= sf))
                     %error has gone to zero, gtfo out of the loop
                     %plot final error
                     x_g_ref(i) = p_i_ref.x;
@@ -247,4 +258,3 @@ classdef TrajectoryFollower
     
     
 end
-

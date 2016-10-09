@@ -1,3 +1,4 @@
+
 classdef CubicSpiralTrajectory < handle
     % CubicSpiral Implements a planar trajectory specified in terms of three 
     % coefficients that adjust the terminal pose of the robot. The initial
@@ -184,7 +185,7 @@ classdef CubicSpiralTrajectory < handle
             persistent a1T a2T b1T b2T r1T r2T;
                     
             if(isempty(inited))
-                load('cubicSpirals2mm_015rads','a1Tab','a2Tab','b1Tab','b2Tab','r1Tab','r2Tab');
+                load('cubicSpirals','a1Tab','a2Tab','b1Tab','b2Tab','r1Tab','r2Tab');
                 inited = true;
                 a1T = a1Tab;a2T = a2Tab;b1T = b1Tab;b2T = b2Tab;r1T = r1Tab;r2T = r2Tab;
             end
@@ -229,7 +230,7 @@ classdef CubicSpiralTrajectory < handle
 
             % Plot the corresponding unit
             su = 1.0;
-            clothu = CubicSpiralTrajectory([au bu su],201);
+            clothu = CubicSpiralTrajectory([au bu su],2001);
 
             %hold on;
 
@@ -248,7 +249,7 @@ classdef CubicSpiralTrajectory < handle
                 as = -as;  
                 ss = -ss;
             end
-            curve = CubicSpiralTrajecotry([as bs ss],201);
+            curve = CubicSpiralTrajectory([as bs ss],201);
         end
             
     end
@@ -312,12 +313,6 @@ classdef CubicSpiralTrajectory < handle
             s = (i-1)*ds;  
             obj.distArray(i) = s;
             obj.curvArray(i) = 0.0;
-            figure(1);
-            plot(obj.poseArray(1, :), obj.poseArray(2, :));
-            figure(2);
-            plot(obj.curvArray);
-            figure(3);
-            plot(obj.distArray, obj.poseArray(2, :));
         end   
         
         function computeTimeSeries(obj)
@@ -389,8 +384,9 @@ classdef CubicSpiralTrajectory < handle
                 V = Vbase*obj.sgn; % Drive forward or backward as desired.
                 K = obj.curvArray(i);
                 w = K*V;
-                vr = V + robotModel.W2*w;
-                vl = V - robotModel.W2*w;               
+                %RobotModel Not Defined
+                vr = V + RobotModel.ModelW*w;
+                vl = V - RobotModel.ModelW*w;               
                 if(abs(vr) > Vbase)
                     vrNew = Vbase * sign(vr);
                     vl = vl * vrNew/vr;
@@ -404,7 +400,7 @@ classdef CubicSpiralTrajectory < handle
                 obj.vlArray(i) = vl;
                 obj.vrArray(i) = vr;
                 obj.VArray(i) = (vr + vl)/2.0;
-                obj.wArray(i) = (vr - vl)/robotModel.W;                
+                obj.wArray(i) = (vr - vl)/RobotModel.ModelW;                
             end
             % Now compute the times that are implied by the velocities and
             % the distances.
@@ -481,7 +477,15 @@ classdef CubicSpiralTrajectory < handle
             x = interp1(obj.distArray,obj.poseArray(1,:),s,'pchip','extrap');
             y = interp1(obj.distArray,obj.poseArray(2,:),s,'pchip','extrap');
             th = interp1(obj.distArray,obj.poseArray(3,:),s,'pchip','extrap');
-            pose  = [x ; y ; th];  
+            pose  = Pose(x, y, th);  
+        end
+        
+        function V = getVAtDist(obj,s)
+            V = interp1(obj.distArray,obj.VArray,s,'pchip','extrap');
+        end
+
+        function w = getwAtDist(obj,s)
+            w = interp1(obj.distArray,obj.wArray,s,'pchip','extrap');
         end
         
         function pose  = getFinalPose(obj)
@@ -516,7 +520,7 @@ classdef CubicSpiralTrajectory < handle
             x = interp1(obj.timeArray,obj.poseArray(1,:),t,'pchip','extrap');
             y = interp1(obj.timeArray,obj.poseArray(2,:),t,'pchip','extrap');
             th = interp1(obj.timeArray,obj.poseArray(3,:),t,'pchip','extrap');
-            pose  = [x ; y ; th];  
+            pose  = Pose(x, y, th);  
         end  
         
         function parms  = getParms(obj)
