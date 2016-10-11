@@ -248,7 +248,7 @@ classdef CubicSpiralTrajectory < handle
                 as = -as;  
                 ss = -ss;
             end
-            curve = CubicSpiralTrajectory([as bs ss],5001);
+            curve = CubicSpiralTrajectory([as bs ss],500);
         end
             
     end
@@ -445,6 +445,14 @@ classdef CubicSpiralTrajectory < handle
             end
         end
         
+       function s  = getDistAtTime(obj,t)
+            if( t < obj.timeArray(1))
+                s = 0.0;
+            else
+                s  = interp1(obj.timeArray,obj.distArray,t,'pchip','extrap');  
+            end
+        end
+        
         function K  = getCurvAtDist(obj,s)
             if( s < obj.distArray(1))
                 K = 0.0;
@@ -463,6 +471,7 @@ classdef CubicSpiralTrajectory < handle
         function pose  = getFinalPose(obj)
             pose  = obj.poseArray(:,obj.numSamples);  
         end  
+        
         
         function time  = getTrajectoryDuration(obj)
             time  = obj.timeArray(:,obj.numSamples);  
@@ -489,6 +498,10 @@ classdef CubicSpiralTrajectory < handle
         end
             
         function pose  = getPoseAtTime(obj,t)
+            if(t<0)
+                pose = Pose(0,0,0);
+                return;
+            end
             x = interp1(obj.timeArray,obj.poseArray(1,:),t,'pchip','extrap');
             y = interp1(obj.timeArray,obj.poseArray(2,:),t,'pchip','extrap');
             th = interp1(obj.timeArray,obj.poseArray(3,:),t,'pchip','extrap');
