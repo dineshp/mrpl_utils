@@ -12,7 +12,6 @@ global T
     setX(X);
     setY(Y);
     setT(T);
-   
     
                
     %disp(event.Header);

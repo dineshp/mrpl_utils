@@ -25,6 +25,16 @@ classdef Pose < handle
             w = atan2(-mat(1,2),mat(1,1));
             vec = [x ; y ; w];
         end
+        
+        function pose = matToPoseVecAsPose(mat)
+            % Convert a homogeneous transform into a vector that can be
+            % passed to the contructor for this class.
+            x = mat(1,3);
+            y = mat(2,3);
+            w = atan2(-mat(1,2),mat(1,1));
+            pose = Pose(x, y, w);
+            
+        end
     end
     
     methods(Access = private)

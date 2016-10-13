@@ -28,6 +28,118 @@ classdef CubicSpiralTrajectory < handle
     
     methods(Static = true)
         
+        function graphSpirals(scale, h)
+            % Make 6 lookup tables to be used for cubicSpiral generation.
+            % Principle is to sample densely in coefficient space and
+            % integrate the curvature to find the curve. Then store the
+            % result in a table that inverts the mapping.
+            % On a 2.6 GHz core i7:
+            % Scale = 100 takes 0.17 minutes
+            % Scale = 50 takes 0.64 minutes
+            % Scale = 10 takes 15 minutes
+            % Scale = 2 takes 381 minutes
+            % Scale = 1 takes > 125 hours (and still needs interpolation)
+            
+            startTic = tic();
+
+            sMax = 1.0;   % length of curve
+            qMax =  pi(); % max bearing
+            qMin = -pi(); % min bearing
+            tMax =  1.5*pi(); % max heading
+            tMin = -1.5*pi(); % min heading
+
+            numT = round(10*126/scale); % heading samples
+            numQ = round(50*126/scale); % bearing samples
+
+            % Do a quick performance estimate
+            radius = 1.0;
+            ds = radius*(qMax-qMin)/numQ;
+            dt = (tMax-tMin)/numT;
+            fprintf('Error predicted %f m in translation, %f rads in rotation\n',ds,dt);
+
+            clothSamples = 20;
+
+            plotSamples = 10000;
+            plotArrayX = zeros(plotSamples);
+            plotArrayY = zeros(plotSamples);
+
+            n = 1;
+            aMax = 195.0/sMax/sMax;
+            bMax = 440.0/sMax/sMax/sMax;
+
+            % 15 minutes at scale = 10
+            % X at scale = 1
+            numA = 40000.0/scale;
+            numB = 25000.0/scale;
+            for a = -aMax:aMax/numA:aMax
+                for b = -bMax:bMax/numB:bMax
+                    ds = sMax/(clothSamples-1); 
+                    x=0.0; y = 0.0; t = 0.0; r = 0.0;
+                    broke = false;
+                    for i=1:clothSamples
+                    % Compute the curve. Break out of this loop, and then 
+                    % immediately continue to next iteration of the for b loop 
+                    % if tmax is exceeded in absolute value at any time.
+                        s_i = (i-1)*ds;
+                        
+                        kurv_s = s_i*(a + b*s_i)*(s_i-sMax);
+
+                        p_t = t;
+                        p_x = x;
+                        p_y = y;
+                        p_r = r;
+
+                        t = p_t + ((kurv_s)*ds);
+                        r = p_r + ((kurv_s*kurv_s)*ds);
+
+                        k00 = cos(p_t);
+                        k01 = sin(p_t);
+
+                        k10 = cos(p_t + (ds/2.0) * kurv_s);
+                        k11 = sin(p_t + (ds/2.0) * kurv_s);
+
+                        k20 = k10;
+                        k21 = k11;
+
+                        k30 = cos(t);
+                        k31 = sin(t);                
+                        x = p_x + ((ds/6.0) * (k00 + 2*(k10 + k20) + k30));
+                        y = p_y + ((ds/6.0) * (k01 + 2*(k11 + k21) + k31));
+                    end
+                    if(broke == true); continue; end;
+
+                    q = atan2(y,x);
+                    %if(~aTab.isInBounds(q,t)); continue; end;
+                    % This is faster
+                    if(q<qMin || q>=qMax || t<tMin || t>=tMax) ; continue; end;
+                    if(n <= plotSamples)
+                        plotArrayX(n) = x;
+                        plotArrayY(n) = y;
+                    elseif(n == plotSamples+1)
+                        if(scale > 20)
+                            figure(h);
+                            plot(plotArrayX(1:n-1),plotArrayY(1:n-1), '-');
+                            hold on;
+                            fprintf('Plot array dumping\n');
+                        end
+                        n = 0;
+                        elapsedTime = toc(startTic);
+                        fprintf('Took %f minutes\n',elapsedTime/60.0);
+                    end;
+                    n = n + 1;
+                end
+
+            end
+
+            elapsedTime = toc(startTic);
+            fprintf('Took %f minutes\n',elapsedTime/60.0);
+            
+            if(scale > 10)
+                figure(h);
+                plot(plotArrayX(1:n-1),plotArrayY(1:n-1), '-');
+            end
+        end
+        
         function makeLookupTable(scale)
             % Make 6 lookup tables to be used for cubicSpiral generation.
             % Principle is to sample densely in coefficient space and
@@ -472,6 +584,13 @@ classdef CubicSpiralTrajectory < handle
             pose  = obj.poseArray(:,obj.numSamples);  
         end  
         
+        function pose  = getFinalPoseAsPose(obj)
+            x = obj.poseArray(1,obj.numSamples);
+            y = obj.poseArray(2,obj.numSamples);
+            th = obj.poseArray(3,obj.numSamples);
+            pose  = Pose(x, y, th);  
+        end
+        
         
         function time  = getTrajectoryDuration(obj)
             time  = obj.timeArray(:,obj.numSamples);  
@@ -479,6 +598,22 @@ classdef CubicSpiralTrajectory < handle
         
         function dist  = getTrajectoryDistance(obj)
             dist  = obj.distArray(:,obj.numSamples);  
+        end
+        
+        function V  = getVAtDist(obj,s)
+            if( s < obj.distArray(1))
+                V = 0.0;
+            else
+                V  = interp1(obj.distArray,obj.VArray,s,'pchip','extrap');  
+            end
+        end
+            
+        function w  = getwAtDist(obj,s)
+            if(s < obj.distArray(1))
+                w = 0.0;
+            else
+                w  = interp1(obj.distArray,obj.wArray,s,'pchip','extrap');  
+            end
         end
         
         function V  = getVAtTime(obj,t)

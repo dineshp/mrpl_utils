@@ -11,6 +11,9 @@ classdef RobotState < handle
         x_g_ref;
         y_g_ref;
         th_g_ref;
+        x_g_act;
+        y_g_act;
+        th_g_act;
         err_x_g_ref;
         err_y_g_ref;
         err_th_g_ref;
@@ -18,7 +21,7 @@ classdef RobotState < handle
     end
     
     methods(Access = public)    
-        function obj = RobotState(n)
+        function obj = RobotState(n, init_pose)
             obj.i = 1;
             
             obj.t = zeros(1, n);
@@ -28,12 +31,22 @@ classdef RobotState < handle
             obj.x = zeros(1, n);
             obj.y = zeros(1, n);
             obj.th = zeros(1, n);
+            obj.x_g_act = zeros(1,n);
+            obj.y_g_act = zeros(1,n);
+            obj.th_g_act = zeros(1,n);
             obj.x_g_ref = zeros(1,n);
             obj.y_g_ref = zeros(1,n);
             obj.th_g_ref = zeros(1,n);
             obj.err_x_g_ref = zeros(1,n);
             obj.err_y_g_ref = zeros(1,n);
             obj.err_th_g_ref = zeros(1,n);
+                                              
+            obj.x_g_act(1:n) = init_pose.x;
+            obj.y_g_act(1:n) = init_pose.y;
+            obj.th_g_act(1:n) = init_pose.th;
+            obj.x_g_ref(1:n) = init_pose.x;
+            obj.y_g_ref(1:n) = init_pose.y;
+            obj.th_g_ref(1:n) = init_pose.th;
             
         end
         
