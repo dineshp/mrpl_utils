@@ -53,6 +53,7 @@ classdef RobotModelAdv
         end
         
         function r_pose = integrateDiffEqDs(kurv, ds, p_pose)
+            
             p_th = p_pose.th;
             p_x = p_pose.x;
             p_y = p_pose.y;
@@ -72,12 +73,11 @@ classdef RobotModelAdv
             k31 = sin(th);                
             x = p_x + ((ds/6.0) * (k00 + 2*(k10 + k20) + k30));
             y = p_y + ((ds/6.0) * (k01 + 2*(k11 + k21) + k31));   
-            
             r_pose = Pose(x, y, th);
         end
         
         function r_pose = integrateDiffEq(V, w, dt, p_pose)
-            
+            disp(p_pose.getPoseVec());
             p_x = p_pose.x;
             p_y = p_pose.y; 
             p_th = p_pose.th;

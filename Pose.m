@@ -69,6 +69,8 @@ classdef Pose < handle
         % the b frame to the a frame.
         
         mat = zeros(3,3);
+        %disp('here');
+        %disp(obj.poseVec);
         x = obj.poseVec(1); y = obj.poseVec(2); th = obj.poseVec(3);
         
         mat(1,1) =  cos(th); mat(1,2) = -sin(th); mat(1,3) = x;
