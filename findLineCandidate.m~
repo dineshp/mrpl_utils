@@ -1,5 +1,4 @@
-function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts)
-    plotG = 0;
+function [found, centroid, laserPts] = findLineCandidate(laserPts)
     found = 0;
     x_full = laserPts(1,:);
     y_full = laserPts(2,:);
@@ -36,7 +35,7 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts)
         poiPose = Pose(poi(1), poi(2), 0);
         point_circle = poiPose.bToA()*circle;
         world_circle = init_pose.bToA()*point_circle;
-        %plot(world_circle(1,:),world_circle(2,:),'y');
+        plot(world_circle(1,:),world_circle(2,:),'y');
         
         
         x_I = x(sailIndices);
@@ -61,13 +60,14 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts)
             continue;
         end
 
-        if abs(lambda(2) - 12.5) >= 1.5
+        if abs(lambda(2) - 12.5) >= 1
             continue;
         end
         
         
              
-      
+        
+        plot(world_circle(1,:),world_circle(2,:),'k');
         %disp(lambda(2));
         
         potentialSail = find(sailIndices);
@@ -122,12 +122,14 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts)
         %disp(th);
         
         
- 
+        
+        if lambda(1) >= 1.3
+                    laserPts(:,logical(sailIndices)) = 0;
+        end
 
-        if abs(lambda(2) - 12.5) >= 5
-            laserPts(:,logical(sailIndices)) = 0;
-            found = 1;
-            break;
+        if abs(lambda(2) - 12.5) >= 1
+                    laserPts(:,logical(sailIndices)) = 0;
+
         end
         
         
@@ -135,16 +137,15 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts)
         
         centroidPts = [x_mean; y_mean; 1];
         world_centroidPts = init_pose.bToA()*centroidPts;
-        %scatter(world_centroidPts(1,:),world_centroidPts(2,:),'k', 'filled');
+        scatter(world_centroidPts(1,:),world_centroidPts(2,:),'k', 'filled');
                  
         centroid = Pose(x_mean, y_mean, th);
                   
         
         laserPts(:,logical(sailIndices)) = 0;
 
-        %plot(world_circle(1,:),world_circle(2,:),'k');
+        plot(world_circle(1,:),world_circle(2,:),'k');
         found = 1;
-        plotG = 1;
         break;
 
     end

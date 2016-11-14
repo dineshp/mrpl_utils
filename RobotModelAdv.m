@@ -77,7 +77,6 @@ classdef RobotModelAdv
         end
         
         function r_pose = integrateDiffEq(V, w, dt, p_pose)
-            disp(p_pose.getPoseVec());
             p_x = p_pose.x;
             p_y = p_pose.y; 
             p_th = p_pose.th;

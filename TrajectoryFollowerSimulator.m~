@@ -1,4 +1,4 @@
-classdef TrajectoryFollowerC < handle
+classdef TrajectoryFollowerSimulator < handle
     
     properties(Constant)
         k_x_p = .01;
@@ -34,7 +34,7 @@ classdef TrajectoryFollowerC < handle
     
     methods(Access = public)    
                 
-        function obj = TrajectoryFollowerC()
+        function obj = TrajectoryFollowerSimulator()
             obj.initialized = 0;
         end
         
@@ -51,7 +51,7 @@ classdef TrajectoryFollowerC < handle
         function fig = init(obj)
             fig = figure(1);
             obj.initialized = 0;
-            localized = 0;
+            obj.localized = 0;
         end
         
         function rc = localize(obj, num_iterations)
@@ -64,7 +64,7 @@ classdef TrajectoryFollowerC < handle
 %     lines_p1 = [p2 p1];
 %     lines_p2 = [p1 p3];
 %     lml = LineMapLocalizer(lines_p1,lines_p2,.01,.005,.0005);
-%     trajFollower = TrajectoryFollowerC(init_pose, lml);
+%     trajFollower = TrajectoryFollowerSimulator(init_pose, lml);
 %     figure;
 %     title(['Bootstrapping']);
 %     xlabel('X (meters)');
@@ -262,26 +262,36 @@ classdef TrajectoryFollowerC < handle
         
         end
         
-        function localizeSim(start_pose)
-            obj.localized 
+        function localizeSim(obj, start_pose)
+            obj.localized = 1;
+            obj.last_pose = start_pose;
         end
+                      
             
-        function [start_pose, goal_pose, state] = executeTrajectorySim(obj, robot, start_pose, goal_pose, velocity)            
-            
+        function [start_pose, goal_pose, state] = executeTrajectorySim(obj, start_pose, goal_pose, velocity)  
             if(obj.localized == 0)
                 obj.localizeSim(start_pose);
             end
-            
-         
-            
-            goal_pose_robot = world_to_robot(goal_pose);
+                              
+            goal_pose_robot = obj.world_to_robot(goal_pose);
             
             curve = CubicSpiralTrajectory.planTrajectory(goal_pose_robot.x, goal_pose_robot.y, goal_pose_robot.th, 1);
+            
+            
+            plotArray1 = curve.poseArray(1,:);
+            plotArray2 = curve.poseArray(2,:);
+            w_full = ones(1,length(plotArray1));
+            curvePts = [plotArray1; plotArray2; w_full];
+            world_curvePts = obj.last_pose.bToA()*curvePts;
+            
+            plot(world_curvePts(1,:),world_curvePts(2,:),'r');
+            
             curve.planVelocities(velocity);
+            obj.localized = 0;
                         
             t_f = curve.getTrajectoryDuration();
-            n = floor(t_f/TrajectoryFollowerC.UpdatePause)+1;
-            obj.robotState = RobotState(n, obj.init_pose);
+            n = floor(t_f/TrajectoryFollowerSimulator.UpdatePause)+1;
+            obj.robotState = RobotState(n, obj.last_pose);
             
             actual_robot = obj.robotState;
             t = actual_robot.t;
@@ -295,13 +305,10 @@ classdef TrajectoryFollowerC < handle
             x_world = actual_robot.x_g_act;
             y_world = actual_robot.y_g_act;
             th_world = actual_robot.th_g_act;
-
-                                            
-         
-            i = actual_robot.i;
-                            
+                                           
+            i = actual_robot.i;                           
             t_i = 0;
-            dt_i = TrajectoryFollowerC.UpdatePause;
+            dt_i = TrajectoryFollowerSimulator.UpdatePause;
             while(actual_robot.i < n)
                 % 1. UPDATE TIME
                 i = actual_robot.i;
@@ -315,13 +322,13 @@ classdef TrajectoryFollowerC < handle
                 [vl_i , vr_i] = RobotModelAdv.limitWheelVelocities([v_l_U , v_r_U]);
 
                 [V_i , w_i] = RobotModelAdv.vlvrToVw(vl_i, vr_i);
-                p_prev = Pose(x(i), y(i), th(i));
+                p_prev = Pose(x_world(i), y_world(i), th_world(i));
                 p_i_act = RobotModelAdv.integrateDiffEq(V_i, w_i, dt_i, p_prev);
 
                 %p_i_act=curr_pose_robot
-                curr_pose_world = robot_to_world(p_i_act);
+                %curr_pose_world = obj.robot_to_world(p_i_act);
                 
-                x_world(i+1) = curr_pose_world.x;
+                x_world(i+1) = p_i_act.x;;
                 y_world(i+1) = curr_pose_world.y;
                 th_world(i+1) = curr_pose_world.th;
                 t(i+1) = t_i;
@@ -347,9 +354,8 @@ classdef TrajectoryFollowerC < handle
                 actual_robot.iPlusPlus;
 
                 %8. DELAY MAC CLOCK
-                pause(TrajectoryFollowerC.UpdatePause);
+                pause(TrajectoryFollowerSimulator.UpdatePause);
             end    
-            robot.stop();
             state = [x; y; th;];         
         end                     
     end

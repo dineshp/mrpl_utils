@@ -316,7 +316,7 @@ k_i = 0;
 v_max = .25;
 a_max = 3*.25;
 
-s_f = 1.03577;
+s_f = .15;
 t_del = .3506;
 t_f = (s_f + ((v_max)^2/a_max))/v_max;
 t_ter = (t_f+t_del+1);

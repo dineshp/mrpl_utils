@@ -266,22 +266,32 @@ classdef TrajectoryFollowerSimulator < handle
             obj.localized = 1;
             obj.last_pose = start_pose;
         end
+                      
             
-        function [start_pose, goal_pose, state] = executeTrajectorySim(obj, robot, start_pose, goal_pose, velocity)            
-            
+        function [start_pose, goal_pose, state] = executeTrajectorySim(obj, start_pose, goal_pose, velocity)  
             if(obj.localized == 0)
                 obj.localizeSim(start_pose);
             end
                               
-            goal_pose_robot = world_to_robot(goal_pose);
+            goal_pose_robot = obj.world_to_robot(goal_pose);
             
             curve = CubicSpiralTrajectory.planTrajectory(goal_pose_robot.x, goal_pose_robot.y, goal_pose_robot.th, 1);
+            
+            
+            plotArray1 = curve.poseArray(1,:);
+            plotArray2 = curve.poseArray(2,:);
+            w_full = ones(1,length(plotArray1));
+            curvePts = [plotArray1; plotArray2; w_full];
+            world_curvePts = obj.last_pose.bToA()*curvePts;
+            
+            plot(world_curvePts(1,:),world_curvePts(2,:),'r');
+            
             curve.planVelocities(velocity);
             obj.localized = 0;
                         
             t_f = curve.getTrajectoryDuration();
             n = floor(t_f/TrajectoryFollowerSimulator.UpdatePause)+1;
-            obj.robotState = RobotState(n, obj.init_pose);
+            obj.robotState = RobotState(n, obj.last_pose);
             
             actual_robot = obj.robotState;
             t = actual_robot.t;
@@ -316,7 +326,7 @@ classdef TrajectoryFollowerSimulator < handle
                 p_i_act = RobotModelAdv.integrateDiffEq(V_i, w_i, dt_i, p_prev);
 
                 %p_i_act=curr_pose_robot
-                curr_pose_world = robot_to_world(p_i_act);
+                curr_pose_world = obj.robot_to_world(p_i_act);
                 
                 x_world(i+1) = curr_pose_world.x;
                 y_world(i+1) = curr_pose_world.y;
@@ -346,7 +356,6 @@ classdef TrajectoryFollowerSimulator < handle
                 %8. DELAY MAC CLOCK
                 pause(TrajectoryFollowerSimulator.UpdatePause);
             end    
-            robot.stop();
             state = [x; y; th;];         
         end                     
     end

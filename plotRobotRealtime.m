@@ -14,5 +14,6 @@ function plotRobotRealtime(pose)
     delete(signal);
     signal = plot(body_world(1,:), body_world(2,:), 'c-', 'Linewidth', 3);
     hold on;
+    pause(.01);
 end
 

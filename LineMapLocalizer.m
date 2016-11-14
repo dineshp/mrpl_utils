@@ -103,6 +103,13 @@ classdef LineMapLocalizer < handle
             ids = find(sqrt(r2) > obj.maxErr);
         end
         
+       function ids = throwInliers(obj,pose,scan_homogeneous)
+            % Find ids of outliers in a scan.
+            worldPts = pose.bToA()*scan_homogeneous;
+            r2 = obj.closestSquaredDistanceToLines(worldPts);
+            ids = find(sqrt(r2) < .05);
+        end
+        
         function avgErr = fitError(obj,pose,ptsInModelFrame)
             % Find the standard deviation of perpendicular distances of
             % all points to all lines

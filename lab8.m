@@ -75,7 +75,31 @@ for i=1:1:14
     end
     x_full = x;
     y_full = y;
-    signal = scatter(x_full, y_full, 'g');
+    
+    figure;
+    p1 = [0 ; 0];
+    p2 = [ 48*.0254 ; 0];
+    p3 = [0 ; 48*.0254 ];
+    lines_p1 = [p2 p1];
+    lines_p2 = [p1 p3];
+    
+    plot(lines_p1(1,:), lines_p1(2,:), 'b-', 'Linewidth', 1, 'DisplayName', 'map');
+    hold on;
+    plot(lines_p2(1,:), lines_p2(2,:), 'b-', 'Linewidth', 1, 'DisplayName', 'map');
+    hold on;
+    lml = LineMapLocalizer(lines_p1,lines_p2,.01,.005,.0005);
+    
+    hold on;
+    init_pose = Pose(0.6096, 0.6096, pi()/2.0);
+    
+    w_full = ones(1,length(x_full));
+    laserPts = [x_full; y_full; w_full];
+
+    ids = lml.throwInliers(init_pose,laserPts);
+    laserPts(:,ids) = [];
+    
+    signal = scatter(laserPts(1,:), laserPts(2,:), 'g');
+    signal2 = scatter(x_full, y_full, 'r');
     pause(2);
     delete(signal);
     pause(1);
