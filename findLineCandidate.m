@@ -6,7 +6,7 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts)
     x = x_full;
     y = y_full;
     sailLength = .125;
-    init_pose = Pose(0.6096, 0.6096, pi()/2.0);
+    init_pose = Pose(0,0,0);
     centroid = Pose(0,0,0);
     
     
@@ -41,7 +41,7 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts)
         
         x_I = x(sailIndices);
         y_I = y(sailIndices);
-        if(length(sailIndices) < 12)
+        if(length(sailIndices) < 9)
             continue;
         end    
 

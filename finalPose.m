@@ -6,11 +6,12 @@ function pose = finalPose( p_pose)
     th = p_pose.th;
 
     % distance s from center of robot to front of robot 
-    s = 0.0635;
+    s = 0.0635; %for aligning the camera 
+  
 
     % distance d from F1 to the goal 
     d = -.03985;
-
+    %d = -.06985;
     
     f = s+d;
     

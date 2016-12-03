@@ -101,7 +101,7 @@ hold on;
 x = zeros(1,1);
 y = zeros(1,1);
 
-    scan = getS;
+    scan = setS;
     ref = zeros(360, 2);
     for n=1:1:360
         if(abs(scan(n)) <= 1 && abs(scan(n)) > .1)
@@ -369,24 +369,35 @@ end
 
 
 
-%%
+%% Challenge Task
 clc;
 close all;
 figure;
+axis([-.25 1.3 -.25 1.3]);
 clf;
 clearvars -except robot;
 trajFollower = TrajectoryFollower();
-trajFollower.last_pose = Pose(0.6096, 0.6096, pi()/2.0);
+trajFollower.last_pose = Pose(.3048, .3048, -pi()/2.0);
+
 clc;
 close all;
 figure;
 clf;
 while(1);
-    foundSail = trajFollower.go_to_sail(robot);   
+    robot.forksDown();
+    pause(0.5);
+    foundSail = trajFollower.go_to_sail(robot); 
+    pause(2);
     if(foundSail)
-        pause(5);
+        
+        trajFollower.ramSail(robot);
+        pause(2);
+        robot.forksUp();
+        pause(2);
+        robot.forksDown();
+        pause(2);
         trajFollower.backUp(robot);
-        pause(5);
+        pause(2);
         trajFollower.turn(robot);
     end
     
@@ -395,12 +406,37 @@ while(1);
 end
 
 
-%%
+
+%% Challenge Task 2
 clc;
 close all;
-
+figure;
+clf;
 clearvars -except robot;
-while(1)
-    turnRelAngle(robot,pi()/2.0);
+trajFollower = TrajectoryFollower();
+%trajFollower.last_pose = Pose(0.5, 0.5, pi()/2.0);
+
+clc;
+close all;
+figure;
+clf;
+while(1);
+    robot.forksDown();
+    pause(0.5);
+    foundSail = trajFollower.go_to_sailNL(robot); 
     pause(2);
+    if(foundSail)
+        trajFollower.ramSailNL(robot);
+        pause(2);
+        robot.forksUp();
+        pause(2);
+        robot.forksDown();
+        pause(2);
+        trajFollower.backUpNL(robot);
+        pause(2);
+        trajFollower.turnNL(robot);
+    end
+    
+    pause(10);
+    clf;
 end

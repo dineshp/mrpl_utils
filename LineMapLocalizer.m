@@ -142,39 +142,75 @@ classdef LineMapLocalizer < handle
             end
         end
         
-        function [success,outPose] = refinePose(obj,inPose,ptsInModelFrame, maxIters)
-            %disp(ptsInModelFrame);
-            success = 0;
+        %copy paste into localization class
+function [success,outPose] = refinePose(obj,inPose,ptsInModelFrame, maxIters)
+            %figure(1)
             %Throw out outliers
-            %ids = obj.throwOutliers(inPose,ptsInModelFrame);
-
-            %ptsInModelFrame(:,ids) = [];
-            %disp(ptsInModelFrame);
+            options = optimset( 'algorithm', {'levenberg-marquardt',.1}, ...
+                    'DerivativeCheck', 'off', ...
+                    'TolX', obj.errThresh, ...
+                    'Display', 'off', ...
+                    'MaxIter', maxIters );
+            ids = obj.throwOutliers(inPose,ptsInModelFrame);
+            inPoseVec = inPose.getPoseVec;
+            ptsInModelFrame(:,ids) = [];
             %determine if worked
-            iterations = 0;
+           % iterations = 1;
             % gain = .01;
             % errThresh = .001;
             % gradThresh = .001;
-            %figure(2);
-            %hold on;
-            outPose = inPose;
-            %disp(outPose.getPoseVec);
-            J = Inf(1,3);
-            while ((iterations < maxIters) && (norm(J) > obj.gradThresh) )
-                [errPlus0,J] = obj.getJacobian(outPose,ptsInModelFrame);
-                %figure(2);
-                %scatter(iterations,errPlus0);
-                if (errPlus0 < obj.errThresh)
-                    success = 1;
-                    break;
-                end
-                outVec = outPose.getPoseVec - obj.gain*J';
-                %disp(outVec);
-                outPose = Pose(outVec);
-                iterations = iterations + 1;
-            end
             
-        end
+            %outPose = inPose;
+            %J = Inf(1,3);
+            obj.fitErrorVec(inPoseVec,ptsInModelFrame);
+            outPoseVec= lsqnonlin( @(poseVec) obj.fitErrorVec(poseVec,ptsInModelFrame), inPoseVec, [], [], options );
+
+%             while ((iterations < maxIters) && (norm(J) > obj.gradThresh) )
+%                 [errPlus0,J] = obj.getJacobian(outPose,ptsInModelFrame);
+%                   scatter(iterations,errPlus0);
+%                   hold on;
+%                 if (errPlus0 < obj.errThresh)
+%                     success = 1;
+%                     break
+%                 end
+%                                   
+%                 outVec = outPose.getPoseVec - obj.gain*J';
+%                 outPose = Pose(outVec);
+%                 figure(iterations)
+%                              hold on;
+%                               plot(obj.lines_p1(1,:),obj.lines_p1(2,:));
+%                             plot(obj.lines_p2(1,:),obj.lines_p2(2,:));
+%                               worldLidarPts = outPose.bToA()*ptsInModelFrame;
+%                             scatter(worldLidarPts(1,:),worldLidarPts(2,:));
+%                             waitforbuttonpress;
+%                 iterations = iterations + 1;
+%             end
+outPose = Pose(outPoseVec);
+errPlus0 = fitError(obj,outPose,ptsInModelFrame);
+success = (errPlus0 < obj.errThresh);
+          
+end
+        
+function avgErr = fitErrorVec(obj,poseVec,ptsInModelFrame)
+            % Find the standard deviation of perpendicular distances of
+            % all points to all lines
+            % transform the points
+            pose= Pose(poseVec);
+            worldPts = pose.bToA()*ptsInModelFrame;
+            r2 = obj.closestSquaredDistanceToLines(worldPts);
+            r2(r2 == Inf) = [];
+            %err = sum(r2);
+           
+            num = length(r2);
+            avgErr = zeros(1,360);
+            if(num >= obj.minPts)
+                 avgErr(1:num) = sqrt(r2);
+               % avgErr = sqrt(err)/num;
+            else
+                % not enough points to make a guess
+                avgErr = Inf(1, 360);
+            end
+end
     end
     
     methods(Access = private)
