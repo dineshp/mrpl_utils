@@ -13,7 +13,7 @@ classdef Pose < handle
     end
     
     properties(Access = public)
-
+        relLength;
     end
     
     methods(Static = true)
@@ -56,6 +56,8 @@ classdef Pose < handle
             else
                 obj.poseVec = [0 ; 0 ; 0];
             end
+            
+            obj.relLength = 0;
         end
         
         function x = x(obj);   x   = obj.poseVec(1);  end        

@@ -1,4 +1,4 @@
-function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts, pose)
+function [plotG, found, centroid, laserPts] = findLineCandidateRelaxed(laserPts, pose)
     plotG = 0;
     found = 0;
     x_full = laserPts(1,:);
@@ -41,7 +41,7 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts, pose)
         
         x_I = x(sailIndices);
         y_I = y(sailIndices);
-        if(length(sailIndices) < 9) %9
+        if(length(sailIndices) < 4) %9
             continue;
         end    
 
@@ -61,7 +61,7 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts, pose)
             continue;
         end
 
-        if abs(lambda(2) - 12.5) >= 1.5 %1.5
+        if abs(lambda(2) - 12.5) >= 5.0 %1.5
             continue;
         end
         
@@ -138,17 +138,12 @@ function [plotG, found, centroid, laserPts] = findLineCandidate(laserPts, pose)
         end
         %disp(th);
         
-        if abs(lambda(2) - 12.5) >= 7
-            laserPts(:,logical(sailIndices)) = 0;
-            found = 1;
-            break;
-        end
         
         plotPoints = laserPts(:,logical(sailIndices));
         plotPoints_w = ones(1,length(plotPoints(1,:)));
         world_plotPoints = init_pose.bToA()*[plotPoints(1,:); plotPoints(2,:); plotPoints_w];
 
-        scatter(world_plotPoints(1,:), world_plotPoints(2,:),'g', 'filled');
+        scatter(world_plotPoints(1,:), world_plotPoints(2,:),'b', 'filled');
         
         
         centroidPts = [x_mean; y_mean; 1];

@@ -10,8 +10,8 @@ function pose = finalPose( p_pose)
   
 
     % distance d from F1 to the goal 
-    d = -.03985;
-    %d = -.06985;
+    %d = -.03985;
+    d = -.06985;
     
     f = s+d;
     

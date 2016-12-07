@@ -11,7 +11,9 @@ classdef CubicSpiralTrajectory < handle
     properties(Access = private)
         parms = [0 0 1];
         sgn=0.0;
-        rampLength = 0.05;
+        %rampLength = 0.05;
+        %final
+        rampLength = 0.075;
     end
     
     properties(Access = public)
@@ -468,7 +470,7 @@ classdef CubicSpiralTrajectory < handle
                     sDn = abs(sf-s);
                     if(sUp < obj.rampLength) % ramp up
                         Vbase = Vbase * sUp/obj.rampLength;
-                    elseif(sDn < 0.05) % ramp down
+                    elseif(sDn < obj.rampLength) % ramp down
                         Vbase = Vbase * sDn/obj.rampLength;
                     end
                 end

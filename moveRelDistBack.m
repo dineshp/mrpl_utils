@@ -1,4 +1,4 @@
-function s_act = moveRelDist(robot,dist)
+function s_act = moveRelDistBack(robot,dist)
 % Same from lab 4 - the one where we moved in a traight line with feedback
 %PROBLEMS - listener callback did not work 100% of the time not sure what
 %the issue was. - in the velocity profile integrator, it keeps giving me
@@ -20,13 +20,11 @@ if (dist < 0)
 end
 
 s_f = dist;
-t_del = .3506;
+t_del = TrajectoryFollower.t_delay;
 t_f = (s_f + ((v_max)^2/a_max))/v_max;
 t_ter = (t_f+t_del+1);
 t = 0;
 s_act = 0;
-
-dt_cmd = .05;
 
 err = 0;
 errInt = 0;
@@ -76,6 +74,7 @@ while(t <= t_ter)
         U = -.25;
     end
     robot.sendVelocity(-U, -U);
+    pause(TrajectoryFollower.UpdatePause);
 end
 
 

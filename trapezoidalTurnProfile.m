@@ -4,7 +4,7 @@ function vel = trapezoidalTurnProfile(t , alphaMax, omegaMax, theta)
 %sooooo yea
 
 
-    W =.08943;
+    W = .08943;
     theta_f = theta;
     t_ramp = omegaMax/alphaMax;
     t_f = ((theta_f + ((omegaMax)^2/alphaMax))/omegaMax);
@@ -21,13 +21,13 @@ function vel = trapezoidalTurnProfile(t , alphaMax, omegaMax, theta)
     
     if(t < t_ramp)
         omegaRef = alphaMax*t;
-        vel = omegaRef*W/2;
+        vel = omegaRef*W;
     elseif(t > t_ramp && (t < (t_f - t_ramp))) 
         omegaRef = omegaMax;
-         vel = omegaRef*W/2;
+         vel = omegaRef*W;
     elseif((t_f - t) < t_ramp)
         omegaRef = (alphaMax)*(t_f - t);
-         vel = omegaRef*W/2;
+         vel = omegaRef*W;
     else
          vel = 0;
     end

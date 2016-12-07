@@ -22,8 +22,8 @@ try
         rangeImg = transpose(scan.Ranges);
         rangeImages(i,:) = rangeImg;
         load gong.mat;
-        soundsc(y);
-        pause(10);
+        %soundsc(y);
+        pause(.5);
     end
     
     load gong.mat;
@@ -32,7 +32,7 @@ try
     soundsc(y);
     load gong.mat;
     soundsc(y);
-    save('rangeImages_map_and_multi_sail_6096_6096_pi-over-2', 'rangeImages');
+    save('rangeImages_final_4ft_3ft_pi-over-2', 'rangeImages');
     
     
     %[m, n] = size(rangeImages);
