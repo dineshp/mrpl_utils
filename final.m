@@ -94,6 +94,8 @@ while(pickup_index <= 10)
     
     if(sail_index >=8)
         trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, .25);
+    else
+        trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, maxV);
     end
 
     foundSail = 0;
