@@ -92,11 +92,7 @@ while(pickup_index <= 10)
     turn_angle = atan2((aquisition.y - current_robot_pose.y), (aquisition.x - current_robot_pose.x)) - current_robot_pose.th;
     trajFollower.turn(robot, turn_angle);
     
-    if(sail_index >=8)
-        trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, .25);
-    else
-        trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, maxV);
-    end
+    trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, maxV);
 
     foundSail = 0;
     sail_to_left = 0;
@@ -122,10 +118,11 @@ while(pickup_index <= 10)
     
     
     if(foundSail)
-        turn_angle = atan2((drop.y - trajFollower.last_pose.y), (drop.x - trajFollower.last_pose.x)) - trajFollower.last_pose.th;    
+        turn_angle = atan2((drop.y - trajFollower.last_pose.y), (drop.x - trajFollower.last_pose.x)) - trajFollower.last_pose.th;
+        trajFollower.turn(robot, turn_angle);          
         picked_up = trajFollower.is_sail_on_fork();
-        if(picked_up)
-            trajFollower.turn(robot, turn_angle);      
+        if(picked_up || sail_index > 6)
+        
             trajFollower.executeTrajectory(robot, trajFollower.last_pose, drop, maxV);
             robot.forksDown();
             dropped = dropped + 1;
