@@ -92,7 +92,9 @@ while(pickup_index <= 10)
     turn_angle = atan2((aquisition.y - current_robot_pose.y), (aquisition.x - current_robot_pose.x)) - current_robot_pose.th;
     trajFollower.turn(robot, turn_angle);
     
-    trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, maxV);
+    if(sail_index >=8)
+        trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, .25);
+    end
 
     foundSail = 0;
     sail_to_left = 0;
@@ -118,12 +120,20 @@ while(pickup_index <= 10)
     
     
     if(foundSail)
-        turn_angle = atan2((drop.y - trajFollower.last_pose.y), (drop.x - trajFollower.last_pose.x)) - trajFollower.last_pose.th;
-        trajFollower.turn(robot, turn_angle);          
-        trajFollower.executeTrajectory(robot, trajFollower.last_pose, drop, maxV);
-        robot.forksDown();
-        dropped = dropped + 1;
-        trajFollower.backUp(robot, .15);
+        turn_angle = atan2((drop.y - trajFollower.last_pose.y), (drop.x - trajFollower.last_pose.x)) - trajFollower.last_pose.th;    
+        picked_up = trajFollower.is_sail_on_fork();
+        if(picked_up)
+            trajFollower.turn(robot, turn_angle);      
+            trajFollower.executeTrajectory(robot, trajFollower.last_pose, drop, maxV);
+            robot.forksDown();
+            dropped = dropped + 1;
+            trajFollower.backUp(robot, .15);
+        else
+            trajFollower.turn(robot, pi());
+            missing_sails = [sail_index missing_sails];
+            trajFollower.backUp(robot, .5 + 1.5*(.3048));
+            robot.forksDown();
+        end
         
     else
         missing_sails = [sail_index missing_sails];
@@ -174,7 +184,7 @@ while(pickup_index <= 10)
 end
 
 
-%% find sail ROBOT
+%% avg count .1 in front
 clc;
 close all;
 clearvars -except robot;
@@ -205,135 +215,78 @@ maxVSail = .15;
 errorT = .001;
 
 trajFollower = TrajectoryFollower(errorT, maxVSail);
-pickUp6 = Pose(12*6*.0254,12*6*.0254,pi/2);
-
-init_pose = aquisitionPose(pickUp6);
+start_pose = Pose(3*0.3048, 6*0.3048, -pi()/2.0);
+init_pose = start_pose;
 trajFollower.last_pose = init_pose;
-
+[rc, init_pose] = trajFollower.localize(init_pose);
 while(1)
-    
-    if(trajFollower.localized ~= 1)
-        [rc, init_pose] = trajFollower.localize(init_pose);
-    end
-        
+    total_count = 0;
+    for m = 1:1:20
+      
+        x = [];
+        y = [];
+        %offset is .25 for 7 and .75 for 8, .5 for 6
+        offset = .25;
+        scan = getS;
+        count = 0;
+        for n=1:1:360
+            th = (n-1)*pi/180;
+            wedge_width_left = 2*pi();
+            wedge_width_right = 2*pi();
+            if((abs(scan(n)) <= .1) && ((th <= wedge_width_left ) || (th >= 2*pi() - wedge_width_right)) )
+                x(n) = scan(n)*cos(th);
+                y(n) = scan(n)*sin(th);
 
-    hold on;
-    
-    plotRobotAnotateC(init_pose);
-    x = [];
-    y = [];
-    %offset is .25 for 7 and .75 for 8, .5 for 6
-    offset = .25;
-    scan = getS;
-    for n=1:1:360
-        th = (n-1)*pi/180;
-        wedge_width_left = pi()/8;
-        wedge_width_right = pi()/4;
-        if((abs(scan(n)) <= 1.5 && abs(scan(n)) > .1) && ((th <= wedge_width_left ) || (th >= 2*pi() - wedge_width_right)) )
-            x(n) = scan(n)*cos(th);
-            y(n) = scan(n)*sin(th);
-
-        else
-          x(n) = 0;
-          y(n) = 0;
-        end
-
-        if((abs(scan(n)) <= 2.5 && abs(scan(n)) > .1))
-            x_full_nowedge(n) = scan(n)*cos(th);
-            y_full_nowedge(n) = scan(n)*sin(th);
-
-        else
-          x_full_nowedge(n) = 0;
-          y_full_nowedge(n) = 0;
-        end
-
-    end
-    x_full = x;
-    y_full = y;
-
-    plotRobotAnotateC(init_pose);
-
-            w_nowedge = ones(1,length(x_full_nowedge));
-            laserPts_nowedge = [x_full_nowedge; y_full_nowedge; w_nowedge];
-            %ids = lml.throwInliers(init_pose,laserPts_nowedge);
-            %laserPts_nowedge(:,ids) = 0;
-            world_laserPts_nowedge = init_pose.bToA()*laserPts_nowedge;
-            scatter(world_laserPts_nowedge(1,:), world_laserPts_nowedge(2,:), 'r');
-            hold on;
-
-
-            w_full = ones(1,length(x_full));
-            laserPts = [x_full; y_full; w_full];
-            ids = lml.throwInliers(init_pose,laserPts);
-            laserPts(:,ids) = 0;
-            
-            %sail map
-
-            %8 9 10 line points
-            margin = 8; %inches
-            p1 = [(7*12)*.0254 ; 12*.0254];
-            p2 = [ 7*12*.0254 ; 4.5*12*.0254 ];
-
-            %midfield
-            p3 = [(0+margin)*0.0254 ; 6*12*.0254 ];
-            p4 = [(8*12-margin)*.0254; 6*12*.0254];
-            sail_lines_p1 = [p2 p3];
-            sail_lines_p2 = [p1 p4];
-            sail_lml = LineMapLocalizerRelaxed(sail_lines_p1,sail_lines_p2,.01,.001,.0005);
-            sail_ids = sail_lml.throwOutliers(init_pose,laserPts);
-            laserPts(:,sail_ids) = 0;
-            
-            
-            
-            x = laserPts(1,:);
-            y = laserPts(2,:);
-            world_laserPts = init_pose.bToA()*laserPts;
-            scatter(world_laserPts(1,:), world_laserPts(2,:), 'g');
-            hold on;
-            
-            is_laserPts_left = 1;
-            poses = [];
-            while(is_laserPts_left == 1)
-                [sailFound, is_laserPts_left, sail, laserPts] = findLineCandidate(laserPts, init_pose);
- 
-                if(sailFound)
-                    sail = finalPose(sail);
-                    tform_curr_pose_world = init_pose.bToA()*sail.bToA();
-                    sail_pose_world = Pose.matToPoseVecAsPose(tform_curr_pose_world);       
-                    poses = [sail_pose_world, poses];
-                    hold on;
-                end
-
-                %disp(nnz(x));
+            else
+              x(n) = 0;
+              y(n) = 0;
             end
-            
-            if(~isempty(poses))
-                sorted = sortClosest(init_pose, poses); 
-                
-                for i=1:length(sorted)
-                    txt = sprintf(' %d ', i);
-                    txt = strcat('\leftarrow ', txt); 
-                    g_pose = sorted(i);
-                    t = text(g_pose.x,g_pose.y,txt,'FontSize',10);
-                    t.Color = 'k';
-                    hold on;
-                end
-            else    
-                disp('sail not found');
+
+            if(abs(scan(n)) <= .1)
+                count = count + 1;
+                x_full_nowedge(n) = scan(n)*cos(th);
+                y_full_nowedge(n) = scan(n)*sin(th);
+
+            else
+              x_full_nowedge(n) = 0;
+              y_full_nowedge(n) = 0;
             end
-                pause(1);
-    disp('reset');
-    resetFigureAndDrawMap();
-    hold on;
+
+        end
+        %<123 sail is on fork
+        %>
+        x_full = x;
+        y_full = y;
+
+                w_nowedge = ones(1,length(x_full_nowedge));
+                laserPts_nowedge = [x_full_nowedge; y_full_nowedge; w_nowedge];
+                ids = lml.throwInliers(init_pose,laserPts_nowedge);
+                laserPts_nowedge(:,ids) = 0;
+                world_laserPts_nowedge = init_pose.bToA()*laserPts_nowedge;
+
+
+                w_full = ones(1,length(x_full));
+                laserPts = [x_full; y_full; w_full];
+
+
+                x = laserPts(1,:);
+                y = laserPts(2,:);
+                world_laserPts = init_pose.bToA()*laserPts;
+
+
+                    pause(.01);
+
+        total_count = total_count + count;
+    end
+    disp(total_count/20);
 end
-
 
 %% detect pick up
 
 
 
 
-%% find scan
+%% verify sail on hook
 clc;
 close all;
 clearvars -except robot;
@@ -351,7 +304,7 @@ p4 = [12* 8*.0254; 12*12*.0254];
 lines_p1 = [p2-[off;0] p1+[0;off] p2+[0;off] p3+[off;0]];
 lines_p2 = [p1+[off;0] p3-[0;off] p4-[0;off] p4-[off;0]];
 lml = LineMapLocalizer(lines_p1,lines_p2,.01,.001,.0005);
-init_pose = Pose(4*0.3048, 3*0.3048, pi()/2.0);
+init_pose = Pose(4*0.3048, 6*0.3048, -pi()/2.0);
 
 %lab13
 maxV = .25;
@@ -359,13 +312,16 @@ maxVSail = .15;
 errorT = .001;
 
 trajFollower = TrajectoryFollower(errorT, maxVSail);
-start_pose = Pose(4*0.3048, 3*0.3048, pi()/2.0);
+start_pose = Pose(4*0.3048, 6*0.3048, -pi()/2.0);
 
-load('rangeImages_final_4ft_3ft_pi-over-2.mat');
-for i=1:1:14
-    scan = transpose(rangeImages(i,:));
+load('rangeImages_nosail_4ft_6ft_neg_pi-over-2.mat');
+for i=1:1:10000
+    scan = transpose(rangeImages(i,:));  
+ 
+        init_pose = trajFollower.localizeSim(init_pose, scan);
+        
+    
     hold on;
-    init_pose = trajFollower.localizeSim(start_pose, scan);
     plotRobotAnotateC(init_pose);
     x = [];
     y = [];
@@ -373,8 +329,8 @@ for i=1:1:14
     offset = .25;
     for n=1:1:360
         th = (n-1)*pi/180;
-        wedge_width = 2*pi();
-        if((abs(scan(n)) <= 1.5 && abs(scan(n)) > .1) && ((th <= wedge_width) || (th >= 2*pi() - wedge_width)) )
+        wedge_width = pi()/2;
+        if((abs(scan(n)) <= 3 && abs(scan(n)) > .1) && ((th <= wedge_width) || (th >= 2*pi() - wedge_width)) )
             x(n) = scan(n)*cos(th);
             y(n) = scan(n)*sin(th);
 
@@ -383,7 +339,7 @@ for i=1:1:14
           y(n) = 0;
         end
 
-        if((abs(scan(n)) <= 2.5 && abs(scan(n)) > .1))
+        if((abs(scan(n)) <= 3 && abs(scan(n)) > .1))
             x_full_nowedge(n) = scan(n)*cos(th);
             y_full_nowedge(n) = scan(n)*sin(th);
 
@@ -400,73 +356,26 @@ for i=1:1:14
 
             w_nowedge = ones(1,length(x_full_nowedge));
             laserPts_nowedge = [x_full_nowedge; y_full_nowedge; w_nowedge];
-            %ids = lml.throwInliers(init_pose,laserPts_nowedge);
-            %laserPts_nowedge(:,ids) = 0;
             world_laserPts_nowedge = init_pose.bToA()*laserPts_nowedge;
-            scatter(world_laserPts_nowedge(1,:), world_laserPts_nowedge(2,:), 'r');
+            scatter(world_laserPts_nowedge(1,:), world_laserPts_nowedge(2,:), 'b');
             hold on;
 
 
+
+
+
+
+            
+            
             w_full = ones(1,length(x_full));
             laserPts = [x_full; y_full; w_full];
-            ids = lml.throwInliers(init_pose,laserPts);
-            laserPts(:,ids) = 0;
-            
-            %sail map
-
-            %8 9 10 line points
-            margin = 8; %inches
-            p1 = [(7*12)*.0254 ; 12*.0254];
-            p2 = [ 7*12*.0254 ; 4.5*12*.0254 ];
-
-            %midfield
-            p3 = [(0+margin)*0.0254 ; 6*12*.0254 ];
-            p4 = [(8*12-margin)*.0254; 6*12*.0254];
-            sail_lines_p1 = [p2 p3];
-            sail_lines_p2 = [p1 p4];
-            sail_lml = LineMapLocalizerRelaxed(sail_lines_p1,sail_lines_p2,.01,.001,.0005);
-            sail_ids = sail_lml.throwOutliers(init_pose,laserPts);
-            laserPts(:,sail_ids) = 0;
-            
-            
-            
             x = laserPts(1,:);
             y = laserPts(2,:);
             world_laserPts = init_pose.bToA()*laserPts;
-            scatter(world_laserPts(1,:), world_laserPts(2,:), 'g');
+            scatter(world_laserPts(1,:), world_laserPts(2,:), 'b', 'filled');
             hold on;
             
-            is_laserPts_left = 1;
-            poses = [];
-            while(is_laserPts_left == 1)
-                [sailFound, is_laserPts_left, sail, laserPts] = findLineCandidateRelaxed(laserPts, init_pose);
- 
-                if(sailFound)
-                    sail = finalPose(sail);
-                    tform_curr_pose_world = init_pose.bToA()*sail.bToA();
-                    sail_pose_world = Pose.matToPoseVecAsPose(tform_curr_pose_world);       
-                    poses = [sail_pose_world, poses];
-                    hold on;
-                end
 
-                %disp(nnz(x));
-            end
-            
-            if(~isempty(poses))
-                sorted = sortClosest(init_pose, poses); 
-                
-                for i=1:length(sorted)
-                    txt = sprintf(' %d ', i);
-                    txt = strcat('\leftarrow ', txt); 
-                    g_pose = sorted(i);
-                    t = text(g_pose.x,g_pose.y,txt,'FontSize',10);
-                    t.Color = 'k';
-                    hold on;
-                end
-                
-            else    
-                disp('sail not found');
-            end
                 pause(1);
     disp('reset');
     resetFigureAndDrawMap();

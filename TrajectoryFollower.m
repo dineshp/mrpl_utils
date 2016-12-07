@@ -180,12 +180,6 @@ classdef TrajectoryFollower < handle
                         errorStruct.message = S;
                         errorStruct.identifier = 'TRJFC:LASER_ISSUE';
                         error(errorStruct);
-                        robot = raspbot;
-                        robot.startLaser();
-                        robot.laser.NewMessageFcn=@laserEventListener;
-                        robot.encoders.NewMessageFcn=@encoderEventListener;
-                        pause(5);
-                        obj.localize(thePose);
                     end
                     scanCount = scanCount + 1;
                     
@@ -221,13 +215,7 @@ classdef TrajectoryFollower < handle
 
                 if(length(laserPts(1,:)) < 3)
                     rc = 0;
-                    %error('pose estimate is way off, all points were thrown as outliers');
-                    robot = raspbot;
-                    robot.startLaser();
-                    robot.laser.NewMessageFcn=@laserEventListener;
-                    robot.encoders.NewMessageFcn=@encoderEventListener;
-                    pause(5);
-                    obj.localize(thePose);
+                    error('pose estimate is way off, all points were thrown as outliers');
                 end
                 
                 start = tic;
@@ -260,6 +248,8 @@ classdef TrajectoryFollower < handle
                     obj.localized = 1;
                     thePose = outPose;
                     plotRobotAnotate(thePose, laserPts);
+                    %plotRobotAnotateC(thePose);
+                    %disp('localization successful');
                 else
                     localizeCount = localizeCount + 1;
                     disp('localization not successful');
@@ -321,25 +311,30 @@ classdef TrajectoryFollower < handle
         
         function picked_up = is_sail_on_fork(obj)
             picked_up = 1;
-            for i=1:5
+            total_count = 0;
+            for m = 1:1:20
+
                 x = [];
                 y = [];
+                %offset is .25 for 7 and .75 for 8, .5 for 6
+                offset = .25;
                 scan = getS;
+                count = 0;
                 for n=1:1:360
-                    pts = 0;
                     th = (n-1)*pi/180;
-                    wedge_width_left = pi()/8;
-                    wedge_width_right = pi()/8;
-                    if((abs(scan(n)) <= 3 && abs(scan(n)) > .1) && ((th <= wedge_width_left ) || (th >= 2*pi() - wedge_width_right)) )
+                    wedge_width_left = 2*pi();
+                    wedge_width_right = 2*pi();
+                    if((abs(scan(n)) <= .1) && ((th <= wedge_width_left ) || (th >= 2*pi() - wedge_width_right)) )
                         x(n) = scan(n)*cos(th);
                         y(n) = scan(n)*sin(th);
-                        pts = pts + 1;
+
                     else
                       x(n) = 0;
                       y(n) = 0;
                     end
 
-                    if((abs(scan(n)) <= 1 && abs(scan(n)) > .1))
+                    if(abs(scan(n)) <= .1)
+                        count = count + 1;
                         x_full_nowedge(n) = scan(n)*cos(th);
                         y_full_nowedge(n) = scan(n)*sin(th);
 
@@ -349,15 +344,19 @@ classdef TrajectoryFollower < handle
                     end
 
                 end
+                %<123 sail is on fork
+                %>
                 x_full = x;
                 y_full = y;
-                
-                if(pts > 5)
-                    picked_up = 0;
-                    disp('sail not detected on forks!!!');
-                end
-                
-                pause(.05);
+
+                            pause(.01);
+
+                total_count = total_count + count;
+            end
+            avg_count = total_count/20;
+            disp(avg_count);
+            if(avg_count < 85)
+                picked_up = 0;
             end
         end
         
@@ -379,11 +378,7 @@ classdef TrajectoryFollower < handle
             %offset is .25 for 7 (maybe more or less), .75 for 8, .3 for 6
             %current is 7
             offset = .25;
-                                                       
-            if(sail_index == 10 || sail_index == 8)
-                 offset = .5;
-            end
-            
+                                                                   
             scan = getS;
             scan_bk = scan;
             for n=1:1:360
@@ -485,11 +480,15 @@ classdef TrajectoryFollower < handle
                     obj.turn(robot, turn_angle);
                     obj.backUp(robot, .15);
                     
-                    obj.executeTrajectory(robot, obj.last_pose, goal_pose, obj.maxVSail);
+                    obj.executeTrajectory(robot, obj.last_pose, goal_pose, .2);
 
                 else
                     obj.turn(robot, turn_angle);
-                    obj.executeTrajectory(robot, obj.last_pose, goal_pose, obj.maxVSail);
+                    if(sail_index >=8)  
+                        obj.executeTrajectory(robot, obj.last_pose, goal_pose, .15);
+                    else
+                        obj.executeTrajectory(robot, obj.last_pose, goal_pose, obj.maxVSail);
+                    end
 
                 end
 %                 if(abs(turn_angle) > deg2rad(20))
@@ -597,8 +596,8 @@ classdef TrajectoryFollower < handle
         function init_pose = localizeSim(obj, start_pose, scan)
             x_l = [];
             y_l = [];
-
-                lml = obj.localizer;
+            disp('here');
+                lml = obj.getLocalizer(5);
                                
                 for n=1:1:360
                     if(abs(scan(n)) <= 3 && abs(scan(n)) > .06)
@@ -622,7 +621,7 @@ classdef TrajectoryFollower < handle
                 x_l = laserPts(1,:);
                 y_l = laserPts(2,:);
 
-
+                disp('here');
                 if(length(laserPts(1,:)) < 3)
                     error('pose estimate is way off, all points were thrown as outliers');
                 end
@@ -651,11 +650,15 @@ classdef TrajectoryFollower < handle
                     laserPts = [x_l; y_l; w_l];
                     [rc,outPose] = lml.refinePose(start_pose,laserPts, 100000);
                 end
-                
+                disp(rc);
                 if(rc)
                     disp(toc(start));
                     init_pose = outPose;
+                    plotRobotAnotateC(init_pose);
                     plotRobotAnotate(init_pose, laserPts);
+                    disp('localizaation successful');
+                else
+                    disp('localizaation not successful');
                 end
                 
                 
@@ -749,12 +752,7 @@ classdef TrajectoryFollower < handle
                         S = sprintf('Encoders not changing at cT=%f, pT=%f, curX%f, curY%f, t_i=%f', cT, pT, curX, curY, t_i);
                         errorStruct.message = S;
                         errorStruct.identifier = 'TRJFC:ENCODER_ISSUE';
-                        %error(errorStruct);
-                        robot = raspbot;
-                        robot.startLaser();
-                        robot.laser.NewMessageFcn=@laserEventListener;
-                        robot.encoders.NewMessageFcn=@encoderEventListener;
-                        pause(5);
+                        error(errorStruct);
                     end
                     count = count + 1;
                     cT = getT;

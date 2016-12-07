@@ -14,7 +14,7 @@ pause(1);
 
 try
     %number of range images
-    n = 15;
+    n = 100;
     rangeImages = zeros(n, 360);
     
     for i=1:1:n
@@ -23,7 +23,7 @@ try
         rangeImages(i,:) = rangeImg;
         load gong.mat;
         %soundsc(y);
-        pause(.5);
+        pause(.01);
     end
     
     load gong.mat;
@@ -32,7 +32,7 @@ try
     soundsc(y);
     load gong.mat;
     soundsc(y);
-    save('rangeImages_final_4ft_3ft_pi-over-2', 'rangeImages');
+    save('rangeImages_nosail_4ft_6ft_neg_pi-over-2.mat', 'rangeImages');
     
     
     %[m, n] = size(rangeImages);
@@ -57,9 +57,8 @@ end
 close all;
 clc;
 figure(1); clf;
-hold on;
-axis([-1.1 1.1 -1.1 1.1]);
-for i=1:1:14
+
+for i=1:1:9999
     x = zeros(1,1);
     y = zeros(1,1);
     scan = transpose(rangeImages(i,:));
@@ -76,7 +75,6 @@ for i=1:1:14
     x_full = x;
     y_full = y;
     
-    figure;
     p1 = [0 ; 0];
     p2 = [ 48*.0254 ; 0];
     p3 = [0 ; 48*.0254 ];
@@ -90,7 +88,7 @@ for i=1:1:14
     lml = LineMapLocalizer(lines_p1,lines_p2,.01,.005,.0005);
     
     hold on;
-    init_pose = Pose(0.6096, 0.6096, pi()/2.0);
+    init_pose = Pose(4*0.6096, 6*0.6096, -pi()/2.0);
     
     w_full = ones(1,length(x_full));
     laserPts = [x_full; y_full; w_full];
