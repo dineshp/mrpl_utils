@@ -215,7 +215,8 @@ classdef TrajectoryFollower < handle
 
                 if(length(laserPts(1,:)) < 3)
                     rc = 0;
-                    error('pose estimate is way off, all points were thrown as outliers');
+                    obj.localize(obj.last_pose);
+                    return;
                 end
                 
                 start = tic;
@@ -364,7 +365,7 @@ classdef TrajectoryFollower < handle
             foundSail = 0;
             sails = [];
             lml = obj.localizer;
-
+            sail_to_left = 1;
             hold on;
 
             start_pose = obj.last_pose;
@@ -378,13 +379,12 @@ classdef TrajectoryFollower < handle
             %offset is .25 for 7 (maybe more or less), .75 for 8, .3 for 6
             %current is 7
             offset = .25;
-                                                                   
             scan = getS;
             scan_bk = scan;
             for n=1:1:360
                 th = (n-1)*pi/180;
                 th = th - offset*atan2(.024, .28);
-                wedge_width_left = pi()/7.5;
+                wedge_width_left = pi()/4;
                 wedge_width_right = pi()/4;
                 if((abs(scan(n)) <= 1.5 && abs(scan(n)) > .1) && ((th <= wedge_width_left ) || (th >= 2*pi() - wedge_width_right)) )
                     x(n) = scan(n)*cos(th);
@@ -475,13 +475,8 @@ classdef TrajectoryFollower < handle
                 turn_angle = atan2((goal_pose.y - obj.last_pose.y), (goal_pose.x - obj.last_pose.x)) - obj.last_pose.th;
                 foundSail = 1;
                 if(abs(turn_angle) > deg2rad(20))
-                    disp('sail found to the right but angle is too large');
-                    turn_angle = atan2((goal_pose.y - obj.last_pose.y), (goal_pose.x - obj.last_pose.x)) - obj.last_pose.th;
-                    obj.turn(robot, turn_angle);
-                    obj.backUp(robot, .15);
-                    
-                    obj.executeTrajectory(robot, obj.last_pose, goal_pose, .2);
-
+                    disp('sail found but angle is too large');
+                    foundSail = 0;
                 else
                     obj.turn(robot, turn_angle);
                     if(sail_index >=8)  
@@ -508,87 +503,89 @@ classdef TrajectoryFollower < handle
             else    
                 disp('sail not found');
             end
-                
-                x = [];
-                y = [];
-                scan = scan_bk;
-                %return only sails to the left
-                for n=1:1:360
-                    th = (n-1)*pi/180;
-                    if((abs(scan(n)) <= 1.5 && abs(scan(n)) > .1) && ((th >= pi/8) && (th <= pi/4) ))
-                        x(n) = scan(n)*cos(th);
-                        y(n) = scan(n)*sin(th);
-
-                    else
-                      x(n) = 0;
-                      y(n) = 0;
-                    end
-
-                    if((abs(scan(n)) <= 1 && abs(scan(n)) > .1))
-                        x_full_nowedge(n) = scan(n)*cos(th);
-                        y_full_nowedge(n) = scan(n)*sin(th);
-
-                    else
-                      x_full_nowedge(n) = 0;
-                      y_full_nowedge(n) = 0;
-                    end
-
-                end
-                x_full = x;
-                y_full = y;
-
-                w_nowedge = ones(1,length(x_full_nowedge));
-                laserPts_nowedge = [x_full_nowedge; y_full_nowedge; w_nowedge];
-                ids = lml.throwInliers(stale_pose,laserPts_nowedge);
-                laserPts_nowedge(:,ids) = 0;
-                world_laserPts_nowedge = stale_pose.bToA()*laserPts_nowedge;
-
-
-                w_full = ones(1,length(x_full));
-                laserPts = [x_full; y_full; w_full];
-                ids = lml.throwInliers(stale_pose,laserPts);
-                laserPts(:,ids) = 0;
-
-                %sail map
-
-                %8 9 10 line points
-                margin = 8; %inches
-                p1 = [(7*12)*.0254 ; 12*.0254];
-                p2 = [ 7*12*.0254 ; 4.5*12*.0254 ];
-
-                %midfield
-                p3 = [(0+margin)*0.0254 ; 6*12*.0254 ];
-                p4 = [(8*12-margin)*.0254; 6*12*.0254];
-                sail_lines_p1 = [p2 p3];
-                sail_lines_p2 = [p1 p4];
-                sail_lml = LineMapLocalizerRelaxed(sail_lines_p1,sail_lines_p2,.01,.001,.0005);
-                sail_ids = sail_lml.throwOutliers(stale_pose,laserPts);
-                laserPts(:,sail_ids) = 0;
-
-
-                x = laserPts(1,:);
-                y = laserPts(2,:);
-                world_laserPts = stale_pose.bToA()*laserPts;
-
-                is_laserPts_left = 1;
-                poses = [];
-                while(is_laserPts_left == 1)
-                    [sailFound, is_laserPts_left, sail, laserPts] = findLineCandidateRelaxed(laserPts, stale_pose);
-
-                    if(sailFound)
-                        sail = finalPose(sail);
-                        tform_curr_pose_world = stale_pose.bToA()*sail.bToA();
-                        sail_pose_world = Pose.matToPoseVecAsPose(tform_curr_pose_world);       
-                        poses = [sail_pose_world, poses];
-                        hold on;
-                    end
-
-                    %disp(nnz(x));
-                end
-                sail_to_left = 0;
-                if(~isempty(poses))
-                    sail_to_left = 1;
-                end
+%                 x = [];
+%                 y = [];
+%                 scan = scan_bk;
+%                 %return only sails to the left
+%                 for n=1:1:360
+%                     th = (n-1)*pi/180;
+%                     wedge_width_left = pi()/2;
+%                     wedge_width_right = pi()/2;
+%                     if((abs(scan(n)) <= 1.5 && abs(scan(n)) > .1) && ((th <= wedge_width_left ) || (th >= 2*pi() - wedge_width_right)) )
+%                       x(n) = 0;
+%                       y(n) = 0;
+%                     end
+% 
+%                     if((abs(scan(n)) <= 1 && abs(scan(n)) > .1))
+%                         x_full_nowedge(n) = scan(n)*cos(th);
+%                         y_full_nowedge(n) = scan(n)*sin(th);
+% 
+%                     else
+%                       x_full_nowedge(n) = 0;
+%                       y_full_nowedge(n) = 0;
+%                     end
+% 
+%                 end
+%                 x_full = x;
+%                 y_full = y;
+% 
+%                 w_nowedge = ones(1,length(x_full_nowedge));
+%                 laserPts_nowedge = [x_full_nowedge; y_full_nowedge; w_nowedge];
+%                 ids = lml.throwInliers(stale_pose,laserPts_nowedge);
+%                 laserPts_nowedge(:,ids) = 0;
+%                 world_laserPts_nowedge = stale_pose.bToA()*laserPts_nowedge;
+% 
+% 
+%                 w_full = ones(1,length(x_full));
+%                 laserPts = [x_full; y_full; w_full];
+%                 ids = lml.throwInliers(stale_pose,laserPts);
+%                 laserPts(:,ids) = 0;
+% 
+%                 %sail map
+% 
+%                 %8 9 10 line points
+%                 margin = 8; %inches
+%                 p1 = [(7*12)*.0254 ; 12*.0254];
+%                 p2 = [ 7*12*.0254 ; 4.5*12*.0254 ];
+% 
+%                 %midfield
+%                 p3 = [(0+margin)*0.0254 ; 6*12*.0254 ];
+%                 p4 = [(8*12-margin)*.0254; 6*12*.0254];
+%                 sail_lines_p1 = [p2 p3];
+%                 sail_lines_p2 = [p1 p4];
+%                 sail_lml = LineMapLocalizerRelaxed(sail_lines_p1,sail_lines_p2,.01,.001,.0005);
+%                 sail_ids = sail_lml.throwOutliers(stale_pose,laserPts);
+%                 laserPts(:,sail_ids) = 0;
+% 
+% 
+%                 x = laserPts(1,:);
+%                 y = laserPts(2,:);
+%                 world_laserPts = stale_pose.bToA()*laserPts;
+% 
+%                 is_laserPts_left = 1;
+%                 poses = [];
+%                 while(is_laserPts_left == 1)
+%                     [sailFound, is_laserPts_left, sail, laserPts] = findLineCandidateRelaxed(laserPts, stale_pose);
+% 
+%                     if(sailFound)
+%                         sail = finalPose(sail);
+%                         tform_curr_pose_world = stale_pose.bToA()*sail.bToA();
+%                         sail_pose_world = Pose.matToPoseVecAsPose(tform_curr_pose_world);       
+%                         poses = [sail_pose_world, poses];
+%                         hold on;
+%                     end
+% 
+%                     %disp(nnz(x));
+%                 end
+%                 sail_to_left = 0;
+%                 num_sails = length(poses);
+%                 if(foundSail)
+%                     num_sails = num_sails - 1;
+%                 end
+%                 
+%                 if(num_sails >= 1)
+%                     sail_to_left = 1;
+%                 end
                 
             
         end        

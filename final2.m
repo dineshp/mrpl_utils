@@ -1,18 +1,18 @@
 %%
+
+robot = raspbot;
+robot.startLaser();
+robot.laser.NewMessageFcn=@laserEventListener;
+robot.encoders.NewMessageFcn=@encoderEventListener;
+pause(5);
+
+%%
 clc;
 close all;
 clearvars -except robot;
 figure('Position',[1500, 0, 1400, 1700]);
 % figure('Position',[1500, 0, 1700, 1400]);
 % axis([-.1 12*8*.0254+.1 -.1 12*6*.0254+.1]);
-
-
-
-robot = raspbot;
-robot.startLaser();
-robot.laser.NewMessageFcn=@laserEventListener;
-robot.encoders.NewMessageFcn=@encoderEventListener;
-pause(2);
 
 
 resetFigureAndDrawMap();
@@ -25,30 +25,37 @@ pickUp4 = Pose(12*4*.0254,12*6*.0254,pi/2);
 pickUp5 = Pose(12*5*.0254,12*6*.0254,pi/2); 
 pickUp6 = Pose(12*6*.0254,12*6*.0254,pi/2);
 pickUp7 = Pose(12*7*.0254,12*6*.0254,pi/2);
+pickUp8 = Pose(12*7*.0254,12*4*.0254,0); 
+pickUp9 = Pose(12*7*.0254,12*3*.0254,0);
+pickUp10 = Pose(12*7*.0254,12*2*.0254,0);
 
-%final             1       2       3       4       5       6       7              
-pickup_array = [pickUp1 pickUp2 pickUp3 pickUp4 pickUp5 pickUp6 pickUp7];
-pickup_array_translate = [1, 2, 3, 4, 5, 6, 7];
+pickUp11 = Pose(12*1*.0254,12*8*.0254,0); 
+pickUp12 = Pose(12*1*.0254,12*9*.0254,0);
+pickUp13 = Pose(12*1*.0254,12*10*.0254,0);
 
+%final             1       2       3       4       5       6       7      8        9        10      11        12      13      
+pickup_array = [pickUp1 pickUp2 pickUp3 pickUp4 pickUp5 pickUp6 pickUp10 pickUp9 pickUp8 pickUp7 pickUp11 pickUp12 pickUp13];
+pickup_array_translate = [1, 2, 3, 4, 5, 6, 10, 9, 8, 7, 11, 12, 13];
+% %lab13
+% pickup_array = [pickUp1 pickUp2 pickUp3 pickUp4 pickUp10 pickUp9 pickUp8 pickUp5 pickUp6 pickUp7 ];
 
+drop1 = Pose(12*1*.0254,12*1*.0254,-pi/2);
+drop2 = Pose(12*2*.0254,12*1*.0254,-pi/2);
+drop3 = Pose(12*3*.0254,12*1*.0254,-pi/2);
+drop4 = Pose(12*4*.0254,12*1*.0254,-pi/2);
+drop5 = Pose(12*5*.0254,12*1*.0254,-pi/2);
+drop6 = Pose(12*6*.0254,12*1*.0254,-pi/2);
+drop7 = Pose(12*7*.0254,12*1*.0254,-pi/2);
 
-drop1 = Pose(12*1*.0254,16*1*.0254,-pi/2);
-drop2 = Pose(12*2*.0254,16*1*.0254,-pi/2);
-drop3 = Pose(12*3*.0254,16*1*.0254,-pi/2);
-drop4 = Pose(12*4*.0254,16*1*.0254,-pi/2);
-drop5 = Pose(12*5*.0254,16*1*.0254,-pi/2);
-drop6 = Pose(12*6*.0254,16*1*.0254,-pi/2);
-drop7 = Pose(12*7*.0254,16*1*.0254,-pi/2);
-
-%final               1    2      3    4     5    6      7       
-dropoff_array = [ drop7 drop6 drop5 drop4 drop3 drop2 drop1];
+%final               1    2      3    4     5    6      7     8     9      10   11    12   13  
+dropoff_array = [ drop1 drop2 drop3 drop4 drop5 drop6 drop7 drop7 drop7 drop7 drop7 drop7 drop7];
 
 % %lab13
 % dropoff_array = [ drop1 drop2 drop3 drop4 drop5 drop6 drop7 drop7 drop7 drop7];
 
 %final
 maxV = .5;
-maxVSail = .25;
+maxVSail = .15;
 errorT = .001;
 
 % %lab13
@@ -57,7 +64,7 @@ errorT = .001;
 % errorT = .001;
 
 trajFollower = TrajectoryFollower(errorT, maxVSail);
-init_pose = Pose(.75*.3048, .75*.3048, -pi()/2.0);
+init_pose = Pose(.3048, .3048, -pi()/2.0);
 trajFollower.last_pose = init_pose;
 
 
@@ -89,7 +96,7 @@ while(pickup_index <= 10)
     if(last_sail_was_missing == 1)  
         trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, .15);
         last_sail_was_missing = 0;
-    elseif(sail_index == 8 || sail_index == 9)
+    elseif(sail_index >= 9)
         trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, .15);
     else
         trajFollower.executeTrajectory(robot, trajFollower.last_pose, aquisition, maxV);
@@ -108,7 +115,7 @@ while(pickup_index <= 10)
         if(foundSail)
             trajFollower.ramSail(robot);
             robot.forksUp();
-            pause(1);            
+            pause(.1);            
             break;
         end
 
